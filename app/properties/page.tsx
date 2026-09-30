@@ -3,75 +3,72 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../utils/supabaseClient";
 
-interface TenantRequest {
+interface PropertyListing {
   id: string | number;
-  name: string;
-  city: string;
-  preferred_suburb?: string | null;
-  room_type_wanted: string;
-  max_price: number | string;
-  whatsapp_number: string;
-  status: string;
-  needs_borehole?: boolean;
-  needs_municipal_water?: boolean;
-  needs_solar_backup?: boolean;
   created_at?: string;
+  room_type: string;
+  suburb?: string | null;
+  city: string;
+  price: number | string;
+  has_borehole?: boolean;
+  has_municipal_water?: boolean;
+  has_solar_backup?: boolean;
+  has_electricity?: boolean;
+  whatsapp_number: string;
+  status?: string;
 }
 
-interface TenantFormData {
-  name: string;
-  city: string;
-  preferred_suburb: string;
-  room_type_wanted: string;
-  max_price: string;
+interface PropertyFormData {
   whatsapp_number: string;
+  city: string;
+  suburb: string;
+  room_type: string;
+  price: string;
   status: string;
 }
 
 const CITIES = ["Harare", "Bulawayo", "Mutare", "Gweru"];
-const STATUSES = ["All statuses", "Searching", "Matched", "Placed"];
+const STATUSES = ["All statuses", "Available", "Occupied"];
 const ROOM_TYPES = [
   "Single Room",
-  "Shared Room",
-  "Bedsitter",
   "1 Bedroom Apartment",
+  "2-Room Flat",
+  "Cottage",
 ];
 
-export default function TenantDashboard() {
-  const [tenants, setTenants] = useState<TenantRequest[]>([]);
+export default function PropertiesDashboard() {
+  const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [statusLoading, setStatusLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("All statuses");
   const [filterCity, setFilterCity] = useState("All cities");
-  const [selectedTenant, setSelectedTenant] = useState<TenantRequest | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
 
-  const [formData, setFormData] = useState<TenantFormData>({
-    name: "",
-    city: "Harare",
-    preferred_suburb: "",
-    room_type_wanted: "Single Room",
-    max_price: "",
-    whatsapp_number: "",
-    status: "Searching",
-  });
-
-  const [needs_borehole, setNeedsBorehole] = useState(false);
-  const [needs_municipal_water, setNeedsMunicipalWater] = useState(false);
-  const [needs_solar_backup, setNeedsSolarBackup] = useState(false);
-
-  const [showForm, setShowForm] = useState(false);
+  // 1. Toggle States Strategy
+  const [showIntake, setShowIntake] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const fetchTenants = async () => {
+  const [formData, setFormData] = useState<PropertyFormData>({
+    whatsapp_number: "",
+    city: "Harare",
+    suburb: "",
+    room_type: "Single Room",
+    price: "",
+    status: "Available",
+  });
+
+  const [has_borehole, setHasBorehole] = useState(false);
+  const [has_municipal_water, setHasMunicipalWater] = useState(false);
+  const [has_solar_backup, setHasSolarBackup] = useState(false);
+
+  const fetchProperties = async () => {
     const { data, error } = await supabase
-      .from("tenant_requests")
-      .select(
-        "id, name, city, preferred_suburb, room_type_wanted, max_price, whatsapp_number, status, needs_borehole, needs_municipal_water, needs_solar_backup, created_at"
-      )
+      .from("landlord_listings")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setTenants(data as TenantRequest[]);
+      setProperties(data as PropertyListing[]);
     }
     setStatusLoading(false);
   };
@@ -80,15 +77,13 @@ export default function TenantDashboard() {
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
-        .from("tenant_requests")
-        .select(
-          "id, name, city, preferred_suburb, room_type_wanted, max_price, whatsapp_number, status, needs_borehole, needs_municipal_water, needs_solar_backup, created_at"
-        )
+        .from("landlord_listings")
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (cancelled) return;
       if (!error && data) {
-        setTenants(data as TenantRequest[]);
+        setProperties(data as PropertyListing[]);
       }
       setStatusLoading(false);
     })();
@@ -97,31 +92,33 @@ export default function TenantDashboard() {
     };
   }, []);
 
-  let filteredTenants = tenants;
+  let filteredProperties = properties;
   if (searchTerm.trim() !== "") {
     const term = searchTerm.toLowerCase();
-    filteredTenants = filteredTenants.filter(t => {
-      const idStr = t.id ? t.id.toString().toLowerCase() : "";
-      const tenCode = "ten-" + idStr.padStart(3, "0");
-      const name = t.name ? t.name.toLowerCase() : "";
-      const suburb = t.preferred_suburb ? t.preferred_suburb.toLowerCase() : "";
-      const city = t.city ? t.city.toLowerCase() : "";
-      const roomType = t.room_type_wanted ? t.room_type_wanted.toLowerCase() : "";
+    filteredProperties = filteredProperties.filter(p => {
+      const idStr = p.id ? p.id.toString().toLowerCase() : "";
+      const propCode = "prop-" + idStr.padStart(3, "0");
+      const suburb = p.suburb ? p.suburb.toLowerCase() : "";
+      const city = p.city ? p.city.toLowerCase() : "";
+      const roomType = p.room_type ? p.room_type.toLowerCase() : "";
       return (
-        name.includes(term) ||
         idStr.includes(term) ||
-        tenCode.includes(term) ||
+        propCode.includes(term) ||
         suburb.includes(term) ||
         city.includes(term) ||
         roomType.includes(term)
       );
     });
   }
+
   if (filterStatus !== "All statuses") {
-    filteredTenants = filteredTenants.filter(t => t.status === filterStatus);
+    filteredProperties = filteredProperties.filter(
+      p => (p.status || "Available") === filterStatus
+    );
   }
+
   if (filterCity !== "All cities") {
-    filteredTenants = filteredTenants.filter(t => t.city === filterCity);
+    filteredProperties = filteredProperties.filter(p => p.city === filterCity);
   }
 
   const handleInputChange = (
@@ -135,20 +132,19 @@ export default function TenantDashboard() {
     e.preventDefault();
     setSubmitError(null);
     const cleanPhone = String(formData.whatsapp_number || "").replace(/[^0-9]/g, "");
-    const maxPrice = parseFloat(formData.max_price);
+    const rentPrice = parseFloat(formData.price);
 
-    const { error } = await supabase.from("tenant_requests").insert([
+    const { error } = await supabase.from("landlord_listings").insert([
       {
-        name: formData.name,
-        city: formData.city,
-        preferred_suburb: formData.preferred_suburb || null,
-        room_type_wanted: formData.room_type_wanted,
-        max_price: maxPrice,
         whatsapp_number: cleanPhone,
-        status: formData.status,
-        needs_borehole,
-        needs_municipal_water,
-        needs_solar_backup,
+        city: formData.city,
+        suburb: formData.suburb.trim() || null,
+        room_type: formData.room_type,
+        price: rentPrice,
+        has_borehole,
+        has_municipal_water,
+        has_solar_backup,
+        has_electricity: has_solar_backup,
       },
     ]);
 
@@ -156,19 +152,19 @@ export default function TenantDashboard() {
       setSubmitError(error.message);
       return;
     }
+
     setFormData({
-      name: "",
-      city: "Harare",
-      preferred_suburb: "",
-      room_type_wanted: "Single Room",
-      max_price: "",
       whatsapp_number: "",
-      status: "Searching",
+      city: "Harare",
+      suburb: "",
+      room_type: "Single Room",
+      price: "",
+      status: "Available",
     });
-    setNeedsBorehole(false);
-    setNeedsMunicipalWater(false);
-    setNeedsSolarBackup(false);
-    fetchTenants();
+    setHasBorehole(false);
+    setHasMunicipalWater(false);
+    setHasSolarBackup(false);
+    fetchProperties();
   };
 
   const whatsappLink = (number: string | number, message: string) => {
@@ -182,7 +178,7 @@ export default function TenantDashboard() {
   return (
     <div style={panelBgStyle}>
       <div style={panelContainerStyle}>
-        {selectedTenant ? (
+        {selectedProperty ? (
           /* SINGLE PROFILE VIEWER SHEET MODAL LAYER */
           <div>
             <div
@@ -197,7 +193,7 @@ export default function TenantDashboard() {
             >
               <div>
                 <span style={{ fontSize: "0.8rem", color: "#666", fontWeight: "bold" }}>
-                  Tenants
+                  Properties
                 </span>
                 <h2
                   style={{
@@ -207,87 +203,84 @@ export default function TenantDashboard() {
                     color: "#ffffff",
                   }}
                 >
-                  TEN-{selectedTenant.id.toString().padStart(3, "0")} · {selectedTenant.name}
+                  PROP-{selectedProperty.id.toString().padStart(3, "0")} · {selectedProperty.room_type}
                 </h2>
               </div>
               <a
                 href={whatsappLink(
-                  selectedTenant.whatsapp_number,
-                  `Hi ${selectedTenant.name}! I saw your request on Mastanda Plug.`
+                  selectedProperty.whatsapp_number,
+                  `Hi! I saw your property listing in ${selectedProperty.suburb || selectedProperty.city} on Mastanda Plug.`
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={messageTenantPillBtn}
               >
-                Message tenant
+                Message landlord
               </a>
             </div>
 
             <div style={detailInnerCardBoxStyle}>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Search location</span>
+                <span style={metaFieldLabel}>Location</span>
                 <span style={metaFieldValue}>
-                  {selectedTenant.preferred_suburb ? `${selectedTenant.preferred_suburb}, ` : ""}
-                  {selectedTenant.city}
+                  {selectedProperty.suburb || "Any Area"}, {selectedProperty.city}
                 </span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Room need</span>
-                <span style={metaFieldValue}>{selectedTenant.room_type_wanted}</span>
+                <span style={metaFieldLabel}>Room type</span>
+                <span style={metaFieldValue}>{selectedProperty.room_type}</span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Minimum bedrooms</span>
-                <span style={metaFieldValue}>1</span>
-              </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Maximum budget</span>
+                <span style={metaFieldLabel}>Monthly rent</span>
                 <span style={{ ...metaFieldValue, color: "#10b981" }}>
-                  ${selectedTenant.max_price}/month
+                  ${selectedProperty.price}/month
                 </span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Profile status</span>
-                <span style={metaFieldValue}>{selectedTenant.status}</span>
+                <span style={metaFieldLabel}>Listing status</span>
+                <span style={metaFieldValue}>{selectedProperty.status || "Available"}</span>
               </div>
               <div style={metaFieldGroup}>
                 <span style={metaFieldLabel}>WhatsApp</span>
                 <span style={{ ...metaFieldValue, color: "#38bdf8" }}>
-                  +{selectedTenant.whatsapp_number}
+                  +{selectedProperty.whatsapp_number}
                 </span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Utilities requested</span>
+                <span style={metaFieldLabel}>Utilities included</span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-                  {selectedTenant.needs_borehole && (
-                    <span style={utilityBadgeStyle}>🚰 Borehole</span>
+                  {selectedProperty.has_borehole && (
+                    <span style={utilityBadgeStyle}>Borehole</span>
                   )}
-                  {selectedTenant.needs_municipal_water && (
-                    <span style={utilityBadgeStyle}>🏢 Council Water</span>
+                  {selectedProperty.has_municipal_water && (
+                    <span style={utilityBadgeStyle}>Council Water</span>
                   )}
-                  {selectedTenant.needs_solar_backup && (
-                    <span style={utilityBadgeStyle}>💡 Solar Backup</span>
+                  {(selectedProperty.has_solar_backup || selectedProperty.has_electricity) && (
+                    <span style={utilityBadgeStyle}>Solar Backup</span>
                   )}
-                  {!selectedTenant.needs_borehole &&
-                    !selectedTenant.needs_municipal_water &&
-                    !selectedTenant.needs_solar_backup && (
-                      <span style={{ color: "#777", fontSize: "0.85rem" }}>None requested</span>
+                  {!selectedProperty.has_borehole &&
+                    !selectedProperty.has_municipal_water &&
+                    !selectedProperty.has_solar_backup &&
+                    !selectedProperty.has_electricity && (
+                      <span style={{ color: "#777", fontSize: "0.85rem" }}>None specified</span>
                     )}
                 </div>
               </div>
             </div>
-            <div onClick={() => setSelectedTenant(null)} style={closeDetailPanelBtn}>
-              ← Back to Tenant Grid
+            <div onClick={() => setSelectedProperty(null)} style={closeDetailPanelBtn}>
+              ← Back to Properties Grid
             </div>
           </div>
         ) : (
           /* DYNAMIC HORIZONTAL SEARCH ROW MATRIX */
           <>
+            {/* 1. Toggle States Header */}
             <div style={headerRowStyle}>
-              <h1 style={titleStyle}>Tenants</h1>
+              <h1 style={titleStyle}>Properties</h1>
               <div
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => setShowIntake(!showIntake)}
                 style={{
-                  backgroundColor: showForm ? "#1f2937" : "#217d9d",
+                  backgroundColor: showIntake ? "#1f2937" : "#217d9d",
                   color: "#ffffff",
                   border: "none",
                   padding: "10px 18px",
@@ -298,11 +291,11 @@ export default function TenantDashboard() {
                   transition: "background-color 0.2s ease",
                 }}
               >
-                {showForm ? "✕ Close Intake" : "＋ Register tenant"}
+                {showIntake ? "✕ Close Intake" : "＋ Quick Property Intake"}
               </div>
             </div>
 
-            {/* FILTER ROW MATRIX */}
+            {/* 4. Uniform Tracker Grid Filters: Search by name or ID, All statuses, All cities */}
             <div style={filterSuiteContainerStyle}>
               <input
                 type="text"
@@ -336,17 +329,17 @@ export default function TenantDashboard() {
               </select>
             </div>
 
-            {/* TABLE LIST VIEWPORT */}
+            {/* 4. Structured Charcoal #141414 Table Schema */}
             <div style={tableViewportOuterWrapper}>
               <div style={scrollContainerIndicator}>
                 <table style={mainDataTableLayout}>
                   <thead>
                     <tr style={tableHeaderRowStyle}>
-                      <th style={thColumnHeadingStyle}>Tenant ↕</th>
+                      <th style={thColumnHeadingStyle}>Property ↕</th>
                       <th style={thColumnHeadingStyle}>Location ↕</th>
-                      <th style={thColumnHeadingStyle}>Room Need ↕</th>
-                      <th style={thColumnHeadingStyle}>Budget ↕</th>
-                      <th style={thColumnHeadingStyle}>UTILITIES ↕</th>
+                      <th style={thColumnHeadingStyle}>Type ↕</th>
+                      <th style={thColumnHeadingStyle}>Rent ↕</th>
+                      <th style={thColumnHeadingStyle}>Utilities ↕</th>
                       <th style={thColumnHeadingStyle}>Status ↕</th>
                     </tr>
                   </thead>
@@ -360,7 +353,7 @@ export default function TenantDashboard() {
                           Loading...
                         </td>
                       </tr>
-                    ) : filteredTenants.length === 0 ? (
+                    ) : filteredProperties.length === 0 ? (
                       <tr>
                         <td
                           colSpan={6}
@@ -370,10 +363,10 @@ export default function TenantDashboard() {
                         </td>
                       </tr>
                     ) : (
-                      filteredTenants.map(item => (
+                      filteredProperties.map(item => (
                         <tr
                           key={item.id}
-                          onClick={() => setSelectedTenant(item)}
+                          onClick={() => setSelectedProperty(item)}
                           style={tableRowStyle}
                         >
                           <td
@@ -384,27 +377,28 @@ export default function TenantDashboard() {
                               textDecoration: "underline",
                             }}
                           >
-                            {item.name}
+                            PROP-{item.id.toString().padStart(3, "0")}
                           </td>
                           <td style={tdCellStyle}>
-                            {item.preferred_suburb ? `${item.preferred_suburb}, ` : ""}{item.city}
+                            {item.suburb ? `${item.suburb}, ` : ""}{item.city}
                           </td>
-                          <td style={tdCellStyle}>{item.room_type_wanted}</td>
-                          <td style={tdCellStyle}>${item.max_price}/mo</td>
+                          <td style={tdCellStyle}>{item.room_type}</td>
+                          <td style={tdCellStyle}>${item.price}/mo</td>
                           <td style={tdCellStyle}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                              {item.needs_borehole && (
-                                <span style={utilityBadgeStyle}>🚰 Borehole</span>
+                              {item.has_borehole && (
+                                <span style={utilityBadgeStyle}>Borehole</span>
                               )}
-                              {item.needs_municipal_water && (
-                                <span style={utilityBadgeStyle}>🏢 Council Water</span>
+                              {item.has_municipal_water && (
+                                <span style={utilityBadgeStyle}>Council Water</span>
                               )}
-                              {item.needs_solar_backup && (
-                                <span style={utilityBadgeStyle}>💡 Solar Backup</span>
+                              {(item.has_solar_backup || item.has_electricity) && (
+                                <span style={utilityBadgeStyle}>Solar Backup</span>
                               )}
-                              {!item.needs_borehole &&
-                                !item.needs_municipal_water &&
-                                !item.needs_solar_backup && (
+                              {!item.has_borehole &&
+                                !item.has_municipal_water &&
+                                !item.has_solar_backup &&
+                                !item.has_electricity && (
                                   <span style={{ color: "#666", fontSize: "0.75rem" }}>—</span>
                                 )}
                             </div>
@@ -412,14 +406,12 @@ export default function TenantDashboard() {
                           <td style={tdCellStyle}>
                             <span
                               style={
-                                item.status === "Matched"
-                                  ? matchedBadgeStyle
-                                  : item.status === "Placed"
-                                  ? placedBadgeStyle
-                                  : searchingBadgeStyle
+                                item.status === "Occupied"
+                                  ? occupiedBadgeStyle
+                                  : availableBadgeStyle
                               }
                             >
-                              {item.status || "Searching"}
+                              {item.status || "Available"}
                             </span>
                           </td>
                         </tr>
@@ -430,28 +422,15 @@ export default function TenantDashboard() {
               </div>
             </div>
 
-            {/* UPGRADED INTAKE PANEL FORM BOX */}
-            {showForm && (
+            {/* 2. Identical Form Elements & 3. Utility Matrix Checkboxes */}
+            {showIntake && (
               <div style={formWrapperCardStyle}>
-                <h2 style={formTitleStyle}>Quick tenant intake</h2>
+                <h2 style={formTitleStyle}>Quick property intake</h2>
                 <p style={formSubtitleStyle}>
-                  Capture a WhatsApp enquiry and add it to the matching queue.
+                  Capture a landlord listing and add it to the matching queue
                 </p>
 
                 <form onSubmit={handleFormSubmit} style={formGridStructure}>
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Full name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Sarah Khumalo"
-                      required
-                      style={inputBoxStyle}
-                    />
-                  </div>
-
                   <div style={fieldBlockStyle}>
                     <label style={labelStyle}>WhatsApp number</label>
                     <input
@@ -489,19 +468,19 @@ export default function TenantDashboard() {
                     <label style={labelStyle}>Target suburb or area</label>
                     <input
                       type="text"
-                      name="preferred_suburb"
-                      value={formData.preferred_suburb}
+                      name="suburb"
+                      value={formData.suburb}
                       onChange={handleInputChange}
-                      placeholder="e.g. Avondale (optional)"
+                      placeholder="e.g. Avondale"
                       style={inputBoxStyle}
                     />
                   </div>
 
                   <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Room type wanted</label>
+                    <label style={labelStyle}>Room type</label>
                     <select
-                      name="room_type_wanted"
-                      value={formData.room_type_wanted}
+                      name="room_type"
+                      value={formData.room_type}
                       onChange={handleInputChange}
                       required
                       style={inputBoxStyle}
@@ -515,11 +494,11 @@ export default function TenantDashboard() {
                   </div>
 
                   <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Maximum monthly budget (USD)</label>
+                    <label style={labelStyle}>Monthly rent price (USD)</label>
                     <input
                       type="number"
-                      name="max_price"
-                      value={formData.max_price}
+                      name="price"
+                      value={formData.price}
                       onChange={handleInputChange}
                       placeholder="e.g. 150"
                       min="0"
@@ -529,13 +508,13 @@ export default function TenantDashboard() {
                     />
                   </div>
 
-                  {/* THREE UTILITY PARAMETERS CHECKBOX CARD */}
+                  {/* 3. Utility Matrix Checkboxes inside dark #0d0d0d background */}
                   <div style={utilityCardBoxStyle}>
                     <label style={checkboxLabelStyle}>
                       <input
                         type="checkbox"
-                        checked={needs_borehole}
-                        onChange={e => setNeedsBorehole(e.target.checked)}
+                        checked={has_borehole}
+                        onChange={e => setHasBorehole(e.target.checked)}
                         style={checkboxStyle}
                       />
                       Borehole clean water source
@@ -543,8 +522,8 @@ export default function TenantDashboard() {
                     <label style={checkboxLabelStyle}>
                       <input
                         type="checkbox"
-                        checked={needs_municipal_water}
-                        onChange={e => setNeedsMunicipalWater(e.target.checked)}
+                        checked={has_municipal_water}
+                        onChange={e => setHasMunicipalWater(e.target.checked)}
                         style={checkboxStyle}
                       />
                       Council municipal water line
@@ -552,8 +531,8 @@ export default function TenantDashboard() {
                     <label style={{ ...checkboxLabelStyle, marginBottom: 0 }}>
                       <input
                         type="checkbox"
-                        checked={needs_solar_backup}
-                        onChange={e => setNeedsSolarBackup(e.target.checked)}
+                        checked={has_solar_backup}
+                        onChange={e => setHasSolarBackup(e.target.checked)}
                         style={checkboxStyle}
                       />
                       Constant solar electrical backup
@@ -567,7 +546,7 @@ export default function TenantDashboard() {
                   )}
 
                   <button type="submit" style={submitPillBtnStyle}>
-                    Save tenant profile
+                    Save property profile
                   </button>
                 </form>
               </div>
@@ -686,25 +665,18 @@ const baseBadgeStyle: React.CSSProperties = {
   fontWeight: "700",
 };
 
-const searchingBadgeStyle: React.CSSProperties = {
-  ...baseBadgeStyle,
-  backgroundColor: "#3a230f",
-  color: "#f59e0b",
-};
-
-const matchedBadgeStyle: React.CSSProperties = {
-  ...baseBadgeStyle,
-  backgroundColor: "#181b3d",
-  color: "#6366f1",
-};
-
-const placedBadgeStyle: React.CSSProperties = {
+const availableBadgeStyle: React.CSSProperties = {
   ...baseBadgeStyle,
   backgroundColor: "#132f1d",
   color: "#10b981",
 };
 
-// Exact Utility Styling Tokens matching Property Matrix
+const occupiedBadgeStyle: React.CSSProperties = {
+  ...baseBadgeStyle,
+  backgroundColor: "#2a2a2a",
+  color: "#888888",
+};
+
 const utilityBadgeStyle: React.CSSProperties = {
   display: "inline-block",
   padding: "3px 8px",

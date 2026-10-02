@@ -63,7 +63,7 @@ export default function Navbar() {
 
           <div style={menuTabsStyle}>
             <Link href="/matches" style={isActive('/matches') ? { ...desktopActiveTabStyle, color: brandColor } : desktopTabStyle}>Matches</Link>
-            <Link href="/list-property" style={isActive('/list-property') ? { ...desktopActiveTabStyle, color: brandColor } : desktopTabStyle}>Properties</Link>
+            <Link href="/properties" style={isActive('/properties') ? { ...desktopActiveTabStyle, color: brandColor } : desktopTabStyle}>Properties</Link>
             <Link href="/find-room" style={isActive('/find-room') ? { ...desktopActiveTabStyle, color: brandColor } : desktopTabStyle}>Tenants</Link>
           </div>
           <div style={{ width: '140px' }} className="hidden md:block"></div>
@@ -83,8 +83,8 @@ export default function Navbar() {
           </Link>
 
           {/* Properties Section */}
-          <Link href="/list-property" style={isActive('/list-property') ? { ...activePillContainer, color: brandColor, backgroundColor: '#13232d' } : inactiveTabStyle}>
-            <span style={isActive('/list-property') ? { ...activeIconStyle, color: brandColor } : iconStyle}>
+          <Link href="/properties" style={isActive('/properties') ? { ...activePillContainer, color: brandColor, backgroundColor: '#13232d' } : inactiveTabStyle}>
+            <span style={isActive('/properties') ? { ...activeIconStyle, color: brandColor } : iconStyle}>
               {/* Custom dual-colored logo used dynamically inside the active/inactive tabs */}
               <HomeLogoIcon size={22} />
             </span>

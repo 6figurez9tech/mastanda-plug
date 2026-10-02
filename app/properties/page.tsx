@@ -354,26 +354,25 @@ export default function PropertiesDashboard() {
               </select>
             </div>
 
-            {/* 4. Structured Charcoal #141414 Table Schema */}
+            {/* 3. Wide Charcoal Matrix Grid Table: Unified #141414 Table Grid with Identical Column Maps */}
             <div style={tableViewportOuterWrapper}>
               <div style={scrollContainerIndicator}>
                 <table style={mainDataTableLayout}>
                   <thead>
                     <tr style={tableHeaderRowStyle}>
-                      <th style={thColumnHeadingStyle}>Property ↕</th>
-                      <th style={thColumnHeadingStyle}>Location ↕</th>
-                      <th style={thColumnHeadingStyle}>Type ↕</th>
-                      <th style={thColumnHeadingStyle}>Rent ↕</th>
-                      <th style={thColumnHeadingStyle}>Utilities ↕</th>
-                      <th style={thColumnHeadingStyle}>Status ↕</th>
+                      <th style={thColumnHeadingStyle}>PROPERTY ↕</th>
+                      <th style={thColumnHeadingStyle}>LOCATION ↕</th>
+                      <th style={thColumnHeadingStyle}>RENT ↕</th>
+                      <th style={thColumnHeadingStyle}>UTILITIES ↕</th>
+                      <th style={thColumnHeadingStyle}>STATUS ↕</th>
                     </tr>
                   </thead>
                   <tbody>
                     {statusLoading ? (
                       <tr>
                         <td
-                          colSpan={6}
-                          style={{ padding: "20px", color: "#666", textAlign: "center" }}
+                          colSpan={5}
+                          style={{ padding: "24px", color: "#666", textAlign: "center" }}
                         >
                           Loading...
                         </td>
@@ -381,8 +380,8 @@ export default function PropertiesDashboard() {
                     ) : filteredProperties.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
-                          style={{ padding: "20px", color: "#666", textAlign: "center" }}
+                          colSpan={5}
+                          style={{ padding: "24px", color: "#666", textAlign: "center" }}
                         >
                           No active records found.
                         </td>
@@ -394,21 +393,26 @@ export default function PropertiesDashboard() {
                           onClick={() => setSelectedProperty(item)}
                           style={tableRowStyle}
                         >
-                          <td
-                            style={{
-                              ...tdCellStyle,
-                              fontWeight: "bold",
-                              color: "#fff",
-                              textDecoration: "underline",
-                            }}
-                          >
-                            PROP-{item.id.toString().padStart(3, "0")}
+                          <td style={tdCellStyle}>
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                color: "#ffffff",
+                                textDecoration: "underline",
+                              }}
+                            >
+                              PROP-{item.id.toString().padStart(3, "0")}
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: "#888888", marginTop: "2px" }}>
+                              {item.room_type}
+                            </div>
                           </td>
                           <td style={tdCellStyle}>
                             {item.suburb ? `${item.suburb}, ` : ""}{item.city}
                           </td>
-                          <td style={tdCellStyle}>{item.room_type}</td>
-                          <td style={tdCellStyle}>${item.price}/mo</td>
+                          <td style={{ ...tdCellStyle, color: "#10b981", fontWeight: "700" }}>
+                            ${item.price}/mo
+                          </td>
                           <td style={tdCellStyle}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {item.has_borehole && (
@@ -447,7 +451,7 @@ export default function PropertiesDashboard() {
               </div>
             </div>
 
-            {/* 2. Identical Form Elements & 3. Utility Matrix Checkboxes */}
+            {/* 2. Global Feature Symmetry: Dark-themed #141414 Form Card Block */}
             {showIntake && (
               <div style={formCardStyle}>
                 <h2 style={formTitleStyle}>Quick property intake</h2>
@@ -519,7 +523,7 @@ export default function PropertiesDashboard() {
                   </div>
 
                   <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Monthly rent price (USD)</label>
+                    <label style={labelStyle}>Monthly rent price</label>
                     <input
                       type="number"
                       name="price"
@@ -533,7 +537,7 @@ export default function PropertiesDashboard() {
                     />
                   </div>
 
-                  {/* 3. Utility Matrix Checkboxes inside dark #0d0d0d background */}
+                  {/* Three Matching Boolean Checkbox Triggers */}
                   <div style={utilityCardBoxStyle}>
                     <label style={checkboxLabelStyle}>
                       <input
@@ -592,11 +596,11 @@ const panelBgStyle: React.CSSProperties = {
   padding: "24px 0 140px 0",
 };
 
-// 1. Layout Sizing Constraints: Scale up to spacious widescreen dashboard boundary of maxWidth: '1200px'
+// 1. Layout Sizing Blueprint: Spacious widescreen layout grid with maxWidth: '1200px'
 const appContainerStyle: React.CSSProperties = {
   maxWidth: "1200px",
   margin: "0 auto",
-  padding: "0 16px",
+  padding: "0 20px",
   width: "100%",
   boxSizing: "border-box",
 };
@@ -643,7 +647,7 @@ const filterSuiteContainerStyle: React.CSSProperties = {
   width: "100%",
 };
 
-// Data Table Structure
+// 3. Wide Charcoal Matrix Grid Table (#141414)
 const tableViewportOuterWrapper: React.CSSProperties = {
   backgroundColor: "#141414",
   border: "1px solid #1f1f1f",
@@ -712,11 +716,14 @@ const occupiedBadgeStyle: React.CSSProperties = {
   color: "#888888",
 };
 
+// Sharp Blue Custom Border Indicator Badges
 const utilityBadgeStyle: React.CSSProperties = {
-  display: "inline-block",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
   padding: "3px 8px",
   borderRadius: "8px",
-  fontSize: "0.7rem",
+  fontSize: "0.72rem",
   fontWeight: "700",
   backgroundColor: "#13232d",
   color: "#38bdf8",
@@ -724,9 +731,9 @@ const utilityBadgeStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-// 2. Responsive Adjustments: Expand 'Quick property intake' container to maxWidth: '1000px'
+// 2. Dark-Themed #141414 Form Card Container Block
 const formCardStyle: React.CSSProperties = {
-  backgroundColor: "#111111",
+  backgroundColor: "#141414",
   border: "1px solid #222",
   borderRadius: "20px",
   padding: "24px",

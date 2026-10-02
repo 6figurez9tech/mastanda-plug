@@ -27,7 +27,7 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '24px' }}>
-          <Link href="/list-property" style={primaryActionBtn}>📢 List a Vacant Property Room</Link>
+          <Link href="/properties" style={primaryActionBtn}>📢 List a Vacant Property Room</Link>
           <Link href="/find-room" style={secondaryActionBtn}>🔍 Register Tenant Search Profile</Link>
           <Link href="/matches" style={matchesActionBtn}>⚡ Launch Active Match Core Engine</Link>
         </div>

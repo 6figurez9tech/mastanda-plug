@@ -177,10 +177,32 @@ export default function PropertiesDashboard() {
 
   return (
     <div style={panelBgStyle}>
-      <div style={panelContainerStyle}>
+      <style>{`
+        .filter-suite-responsive {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 24px;
+          width: 100%;
+        }
+        @media (min-width: 768px) {
+          .filter-suite-responsive {
+            flex-direction: row;
+            align-items: center;
+          }
+          .filter-search-box {
+            flex: 2;
+          }
+          .filter-dropdown-box {
+            flex: 1;
+            min-width: 180px;
+          }
+        }
+      `}</style>
+      <div style={appContainerStyle}>
         {selectedProperty ? (
           /* SINGLE PROFILE VIEWER SHEET MODAL LAYER */
-          <div>
+          <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
             <div
               style={{
                 display: "flex",
@@ -223,7 +245,7 @@ export default function PropertiesDashboard() {
               <div style={metaFieldGroup}>
                 <span style={metaFieldLabel}>Location</span>
                 <span style={metaFieldValue}>
-                  {selectedProperty.suburb || "Any Area"}, {selectedProperty.city}
+                  {selectedProperty.suburb ? `${selectedProperty.suburb}, ` : ""}{selectedProperty.city}
                 </span>
               </div>
               <div style={metaFieldGroup}>
@@ -250,13 +272,13 @@ export default function PropertiesDashboard() {
                 <span style={metaFieldLabel}>Utilities included</span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
                   {selectedProperty.has_borehole && (
-                    <span style={utilityBadgeStyle}>Borehole</span>
+                    <span style={utilityBadgeStyle}>🚰 Borehole</span>
                   )}
                   {selectedProperty.has_municipal_water && (
-                    <span style={utilityBadgeStyle}>Council Water</span>
+                    <span style={utilityBadgeStyle}>🏢 Council</span>
                   )}
                   {(selectedProperty.has_solar_backup || selectedProperty.has_electricity) && (
-                    <span style={utilityBadgeStyle}>Solar Backup</span>
+                    <span style={utilityBadgeStyle}>💡 Solar</span>
                   )}
                   {!selectedProperty.has_borehole &&
                     !selectedProperty.has_municipal_water &&
@@ -296,18 +318,20 @@ export default function PropertiesDashboard() {
             </div>
 
             {/* 4. Uniform Tracker Grid Filters: Search by name or ID, All statuses, All cities */}
-            <div style={filterSuiteContainerStyle}>
+            <div className="filter-suite-responsive" style={filterSuiteContainerStyle}>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Search by name or ID"
                 style={searchBarFieldStyle}
+                className="filter-search-box"
               />
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
                 style={dropdownWidgetStyle}
+                className="filter-dropdown-box"
               >
                 {STATUSES.map(s => (
                   <option key={s} value={s}>
@@ -319,6 +343,7 @@ export default function PropertiesDashboard() {
                 value={filterCity}
                 onChange={e => setFilterCity(e.target.value)}
                 style={dropdownWidgetStyle}
+                className="filter-dropdown-box"
               >
                 <option value="All cities">All cities</option>
                 {CITIES.map(c => (
@@ -387,13 +412,13 @@ export default function PropertiesDashboard() {
                           <td style={tdCellStyle}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {item.has_borehole && (
-                                <span style={utilityBadgeStyle}>Borehole</span>
+                                <span style={utilityBadgeStyle}>🚰 Borehole</span>
                               )}
                               {item.has_municipal_water && (
-                                <span style={utilityBadgeStyle}>Council Water</span>
+                                <span style={utilityBadgeStyle}>🏢 Council</span>
                               )}
                               {(item.has_solar_backup || item.has_electricity) && (
-                                <span style={utilityBadgeStyle}>Solar Backup</span>
+                                <span style={utilityBadgeStyle}>💡 Solar</span>
                               )}
                               {!item.has_borehole &&
                                 !item.has_municipal_water &&
@@ -424,7 +449,7 @@ export default function PropertiesDashboard() {
 
             {/* 2. Identical Form Elements & 3. Utility Matrix Checkboxes */}
             {showIntake && (
-              <div style={formWrapperCardStyle}>
+              <div style={formCardStyle}>
                 <h2 style={formTitleStyle}>Quick property intake</h2>
                 <p style={formSubtitleStyle}>
                   Capture a landlord listing and add it to the matching queue
@@ -567,17 +592,23 @@ const panelBgStyle: React.CSSProperties = {
   padding: "24px 0 140px 0",
 };
 
-const panelContainerStyle: React.CSSProperties = {
-  maxWidth: "460px",
+// 1. Layout Sizing Constraints: Scale up to spacious widescreen dashboard boundary of maxWidth: '1200px'
+const appContainerStyle: React.CSSProperties = {
+  maxWidth: "1200px",
   margin: "0 auto",
-  padding: "0 14px",
+  padding: "0 16px",
+  width: "100%",
+  boxSizing: "border-box",
 };
+
+const panelContainerStyle = appContainerStyle;
 
 const headerRowStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   marginBottom: "20px",
+  width: "100%",
 };
 
 const titleStyle: React.CSSProperties = {
@@ -609,6 +640,7 @@ const filterSuiteContainerStyle: React.CSSProperties = {
   flexDirection: "column",
   gap: "10px",
   marginBottom: "24px",
+  width: "100%",
 };
 
 // Data Table Structure
@@ -618,16 +650,19 @@ const tableViewportOuterWrapper: React.CSSProperties = {
   borderRadius: "16px",
   overflow: "hidden",
   marginBottom: "24px",
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const scrollContainerIndicator: React.CSSProperties = {
   overflowX: "auto",
   WebkitOverflowScrolling: "touch",
+  width: "100%",
 };
 
 const mainDataTableLayout: React.CSSProperties = {
   width: "100%",
-  minWidth: "440px",
+  minWidth: "600px",
   borderCollapse: "collapse",
   textAlign: "left",
 };
@@ -686,17 +721,24 @@ const utilityBadgeStyle: React.CSSProperties = {
   backgroundColor: "#13232d",
   color: "#38bdf8",
   border: "1px solid #1e3a4b",
+  whiteSpace: "nowrap",
 };
 
-// Card & Form Layouts
-const formWrapperCardStyle: React.CSSProperties = {
+// 2. Responsive Adjustments: Expand 'Quick property intake' container to maxWidth: '1000px'
+const formCardStyle: React.CSSProperties = {
   backgroundColor: "#111111",
   border: "1px solid #222",
   borderRadius: "20px",
   padding: "24px",
   marginBottom: "24px",
   boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
+  maxWidth: "1000px",
+  width: "100%",
+  margin: "0 auto 24px auto",
+  boxSizing: "border-box",
 };
+
+const formWrapperCardStyle = formCardStyle;
 
 const formTitleStyle: React.CSSProperties = {
   margin: "0 0 4px 0",

@@ -41,6 +41,109 @@ const PROPERTY_TYPES = [
 ];
 const ROOM_TYPES = PROPERTY_TYPES;
 
+// Custom Dropdown Component
+interface CustomDropdownProps {
+  value: string;
+  options: string[];
+  placeholder: string;
+  onSelect: (value: string) => void;
+  isDarkMode: boolean;
+}
+
+function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: CustomDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const getTriggerStyle = () => ({
+    boxSizing: 'border-box',
+    width: '100%',
+    padding: '12px 16px',
+    backgroundColor: isDarkMode ? '#1a1a1a' : '#f1f3f5',
+    border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e9ecef',
+    borderRadius: '12px',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    outline: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  });
+
+  const getDropdownStyle = () => ({
+    position: 'absolute' as const,
+    top: '100%',
+    left: 0,
+    width: '100%',
+    marginTop: '6px',
+    zIndex: 99999,
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    border: isDarkMode ? '1px solid #222' : '1px solid #e9ecef',
+    borderRadius: '16px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    maxHeight: '200px',
+    overflowY: 'auto' as const,
+  });
+
+  const getOptionStyle = (isHovered: boolean) => ({
+    padding: '12px 16px',
+    cursor: 'pointer',
+    backgroundColor: isHovered ? (isDarkMode ? '#1c1c1c' : '#f8f9fa') : 'transparent',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    transition: 'background-color 0.15s ease',
+  });
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={getTriggerStyle()}
+      >
+        <span>{value || placeholder}</span>
+        <span style={{ fontSize: '0.8rem', marginLeft: '8px' }}>
+          {isOpen ? '▲' : '▼'}
+        </span>
+      </div>
+      {isOpen && (
+        <div style={getDropdownStyle()}>
+          {options.map((option) => (
+            <div
+              key={option}
+              onClick={() => {
+                onSelect(option);
+                setIsOpen(false);
+              }}
+              style={getOptionStyle(false)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#1c1c1c' : '#f8f9fa';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              {option}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PropertiesDashboard() {
   const router = useRouter();
   const touchStartX = useRef(0);
@@ -268,11 +371,6 @@ export default function PropertiesDashboard() {
     color: isDarkMode ? "#ffffff" : "#212529",
     fontSize: "0.95rem",
     outline: "none",
-  });
-
-  const getDropdownWidgetStyle = () => ({
-    ...getSearchBarFieldStyle(),
-    appearance: "none",
   });
 
   const getFilterSuiteContainerStyle = () => ({
@@ -715,31 +813,20 @@ export default function PropertiesDashboard() {
                 style={getSearchBarFieldStyle()}
                 className="filter-search-box"
               />
-              <select
+              <CustomDropdown
                 value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                style={getDropdownWidgetStyle()}
-                className="filter-dropdown-box"
-              >
-                {STATUSES.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <select
+                options={STATUSES}
+                placeholder="All statuses"
+                onSelect={setFilterStatus}
+                isDarkMode={isDarkMode}
+              />
+              <CustomDropdown
                 value={filterCity}
-                onChange={e => setFilterCity(e.target.value)}
-                style={getDropdownWidgetStyle()}
-                className="filter-dropdown-box"
-              >
-                <option value="All cities">All cities</option>
-                {CITIES.map(c => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                options={["All cities", ...CITIES]}
+                placeholder="All cities"
+                onSelect={setFilterCity}
+                isDarkMode={isDarkMode}
+              />
             </div>
 
             <div style={getTableViewportOuterWrapper()}>
@@ -872,19 +959,13 @@ export default function PropertiesDashboard() {
 
                   <div style={getFieldBlockStyle()}>
                     <label style={getLabelStyle()}>Target city</label>
-                    <select
-                      name="city"
+                    <CustomDropdown
                       value={formData.city}
-                      onChange={handleInputChange}
-                      required
-                      style={getInputBoxStyle()}
-                    >
-                      {CITIES.map(c => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                      options={CITIES}
+                      placeholder="Select city"
+                      onSelect={(value) => setFormData(prev => ({ ...prev, city: value }))}
+                      isDarkMode={isDarkMode}
+                    />
                   </div>
 
                   <div style={getFieldBlockStyle()}>
@@ -901,19 +982,13 @@ export default function PropertiesDashboard() {
 
                   <div style={getFieldBlockStyle()}>
                     <label style={getLabelStyle()}>Property type</label>
-                    <select
-                      name="room_type"
+                    <CustomDropdown
                       value={formData.room_type}
-                      onChange={handleInputChange}
-                      required
-                      style={getInputBoxStyle()}
-                    >
-                      {PROPERTY_TYPES.map(r => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
+                      options={PROPERTY_TYPES}
+                      placeholder="Select property type"
+                      onSelect={(value) => setFormData(prev => ({ ...prev, room_type: value }))}
+                      isDarkMode={isDarkMode}
+                    />
                   </div>
 
                   <div style={getFieldBlockStyle()}>

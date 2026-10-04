@@ -26,6 +26,109 @@ interface TenantRequest {
 
 const CITIES = ['Harare', 'Bulawayo', 'Mutare', 'Gweru'];
 
+// Custom Dropdown Component
+interface CustomDropdownProps {
+  value: string;
+  options: string[];
+  placeholder: string;
+  onSelect: (value: string) => void;
+  isDarkMode: boolean;
+}
+
+function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: CustomDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const getTriggerStyle = () => ({
+    boxSizing: 'border-box',
+    width: '100%',
+    padding: '12px 16px',
+    backgroundColor: isDarkMode ? '#1a1a1a' : '#f1f3f5',
+    border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e9ecef',
+    borderRadius: '12px',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    outline: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  });
+
+  const getDropdownStyle = () => ({
+    position: 'absolute' as const,
+    top: '100%',
+    left: 0,
+    width: '100%',
+    marginTop: '6px',
+    zIndex: 99999,
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    border: isDarkMode ? '1px solid #222' : '1px solid #e9ecef',
+    borderRadius: '16px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    maxHeight: '200px',
+    overflowY: 'auto' as const,
+  });
+
+  const getOptionStyle = (isHovered: boolean) => ({
+    padding: '12px 16px',
+    cursor: 'pointer',
+    backgroundColor: isHovered ? (isDarkMode ? '#1c1c1c' : '#f8f9fa') : 'transparent',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    transition: 'background-color 0.15s ease',
+  });
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={getTriggerStyle()}
+      >
+        <span>{value || placeholder}</span>
+        <span style={{ fontSize: '0.8rem', marginLeft: '8px' }}>
+          {isOpen ? '▲' : '▼'}
+        </span>
+      </div>
+      {isOpen && (
+        <div style={getDropdownStyle()}>
+          {options.map((option) => (
+            <div
+              key={option}
+              onClick={() => {
+                onSelect(option);
+                setIsOpen(false);
+              }}
+              style={getOptionStyle(false)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#1c1c1c' : '#f8f9fa';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              {option}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Matches() {
   const router = useRouter();
   const touchStartX = useRef(0);
@@ -57,8 +160,7 @@ export default function Matches() {
   const brandTeal = '#217d9d';
   const brandDarkTealbg = '#13232d';
 
-  const handleCityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedCity = e.target.value;
+  const handleCityChange = async (selectedCity: string) => {
     setCity(selectedCity);
     if (!selectedCity) { setListings([]); setRequests([]); setStatus('idle'); return; }
 
@@ -170,18 +272,6 @@ export default function Matches() {
     color: isDarkMode ? '#666' : '#6c757d',
     marginBottom: '6px',
     letterSpacing: '0.3px',
-  });
-
-  const getSelectInputStyle = () => ({
-    display: 'block',
-    width: '100%',
-    padding: '12px',
-    borderRadius: '10px',
-    backgroundColor: isDarkMode ? '#1a1a1a' : '#f1f3f5',
-    border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e9ecef',
-    color: isDarkMode ? '#fff' : '#212529',
-    outline: 'none',
-    fontSize: '0.95rem',
   });
 
   const getTabSwitcherGrid = () => ({
@@ -396,10 +486,13 @@ export default function Matches() {
 
         <div style={getFilterBoxStyle()}>
           <label style={getFilterLabelStyle()}>Target City Filter</label>
-          <select value={city} onChange={handleCityChange} style={getSelectInputStyle()}>
-            <option value="">Select location...</option>
-            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <CustomDropdown
+            value={city}
+            options={CITIES}
+            placeholder="Select location..."
+            onSelect={handleCityChange}
+            isDarkMode={isDarkMode}
+          />
         </div>
 
         {status === 'loading' && <p style={{ color: isDarkMode ? '#888' : '#6c757d', textAlign: 'center', fontSize: '0.9rem', margin: '30px 0' }}>Scanning pairing matrices...</p>}

@@ -30,12 +30,15 @@ interface TenantFormData {
 
 const CITIES = ["Harare", "Bulawayo", "Mutare", "Gweru"];
 const STATUSES = ["All statuses", "Searching", "Matched", "Placed"];
-const ROOM_TYPES = [
-  "Single Room",
-  "Shared Room",
-  "Bedsitter",
-  "1 Bedroom Apartment",
+const PROPERTY_TYPES = [
+  "Single Room / Bed Sitter",
+  "Cottage",
+  "Apartment",
+  "Town House",
+  "Standalone House",
+  "Luxury Villa",
 ];
+const ROOM_TYPES = PROPERTY_TYPES;
 
 export default function TenantDashboard() {
   const [tenants, setTenants] = useState<TenantRequest[]>([]);
@@ -49,7 +52,7 @@ export default function TenantDashboard() {
     name: "",
     city: "Harare",
     preferred_suburb: "",
-    room_type_wanted: "Single Room",
+    room_type_wanted: "Single Room / Bed Sitter",
     max_price: "",
     whatsapp_number: "",
     status: "Searching",
@@ -160,7 +163,7 @@ export default function TenantDashboard() {
       name: "",
       city: "Harare",
       preferred_suburb: "",
-      room_type_wanted: "Single Room",
+      room_type_wanted: "Single Room / Bed Sitter",
       max_price: "",
       whatsapp_number: "",
       status: "Searching",
@@ -181,10 +184,32 @@ export default function TenantDashboard() {
 
   return (
     <div style={panelBgStyle}>
+      <style>{`
+        .filter-suite-responsive {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 24px;
+          width: 100%;
+        }
+        @media (min-width: 768px) {
+          .filter-suite-responsive {
+            flex-direction: row;
+            align-items: center;
+          }
+          .filter-search-box {
+            flex: 2;
+          }
+          .filter-dropdown-box {
+            flex: 1;
+            min-width: 180px;
+          }
+        }
+      `}</style>
       <div style={panelContainerStyle}>
         {selectedTenant ? (
           /* SINGLE PROFILE VIEWER SHEET MODAL LAYER */
-          <div>
+          <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
             <div
               style={{
                 display: "flex",
@@ -232,7 +257,7 @@ export default function TenantDashboard() {
                 </span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Room need</span>
+                <span style={metaFieldLabel}>Property type</span>
                 <span style={metaFieldValue}>{selectedTenant.room_type_wanted}</span>
               </div>
               <div style={metaFieldGroup}>
@@ -262,10 +287,10 @@ export default function TenantDashboard() {
                     <span style={utilityBadgeStyle}>🚰 Borehole</span>
                   )}
                   {selectedTenant.needs_municipal_water && (
-                    <span style={utilityBadgeStyle}>🏢 Council Water</span>
+                    <span style={utilityBadgeStyle}>🏢 Council</span>
                   )}
                   {selectedTenant.needs_solar_backup && (
-                    <span style={utilityBadgeStyle}>💡 Solar Backup</span>
+                    <span style={utilityBadgeStyle}>💡 Solar</span>
                   )}
                   {!selectedTenant.needs_borehole &&
                     !selectedTenant.needs_municipal_water &&
@@ -303,18 +328,20 @@ export default function TenantDashboard() {
             </div>
 
             {/* FILTER ROW MATRIX */}
-            <div style={filterSuiteContainerStyle}>
+            <div className="filter-suite-responsive" style={filterSuiteContainerStyle}>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Search by name or ID"
                 style={searchBarFieldStyle}
+                className="filter-search-box"
               />
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
                 style={dropdownWidgetStyle}
+                className="filter-dropdown-box"
               >
                 {STATUSES.map(s => (
                   <option key={s} value={s}>
@@ -326,6 +353,7 @@ export default function TenantDashboard() {
                 value={filterCity}
                 onChange={e => setFilterCity(e.target.value)}
                 style={dropdownWidgetStyle}
+                className="filter-dropdown-box"
               >
                 <option value="All cities">All cities</option>
                 {CITIES.map(c => (
@@ -344,7 +372,7 @@ export default function TenantDashboard() {
                     <tr style={tableHeaderRowStyle}>
                       <th style={thColumnHeadingStyle}>Tenant ↕</th>
                       <th style={thColumnHeadingStyle}>Location ↕</th>
-                      <th style={thColumnHeadingStyle}>Room Need ↕</th>
+                      <th style={thColumnHeadingStyle}>PROPERTY TYPE ↕</th>
                       <th style={thColumnHeadingStyle}>Budget ↕</th>
                       <th style={thColumnHeadingStyle}>UTILITIES ↕</th>
                       <th style={thColumnHeadingStyle}>Status ↕</th>
@@ -389,7 +417,16 @@ export default function TenantDashboard() {
                           <td style={tdCellStyle}>
                             {item.preferred_suburb ? `${item.preferred_suburb}, ` : ""}{item.city}
                           </td>
-                          <td style={tdCellStyle}>{item.room_type_wanted}</td>
+                          <td style={tdCellStyle}>
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                color: "#ffffff",
+                              }}
+                            >
+                              {item.room_type_wanted}
+                            </div>
+                          </td>
                           <td style={tdCellStyle}>${item.max_price}/mo</td>
                           <td style={tdCellStyle}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -397,10 +434,10 @@ export default function TenantDashboard() {
                                 <span style={utilityBadgeStyle}>🚰 Borehole</span>
                               )}
                               {item.needs_municipal_water && (
-                                <span style={utilityBadgeStyle}>🏢 Council Water</span>
+                                <span style={utilityBadgeStyle}>🏢 Council</span>
                               )}
                               {item.needs_solar_backup && (
-                                <span style={utilityBadgeStyle}>💡 Solar Backup</span>
+                                <span style={utilityBadgeStyle}>💡 Solar</span>
                               )}
                               {!item.needs_borehole &&
                                 !item.needs_municipal_water &&
@@ -498,7 +535,7 @@ export default function TenantDashboard() {
                   </div>
 
                   <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Room type wanted</label>
+                    <label style={labelStyle}>Property type</label>
                     <select
                       name="room_type_wanted"
                       value={formData.room_type_wanted}
@@ -506,7 +543,7 @@ export default function TenantDashboard() {
                       required
                       style={inputBoxStyle}
                     >
-                      {ROOM_TYPES.map(r => (
+                      {PROPERTY_TYPES.map(r => (
                         <option key={r} value={r}>
                           {r}
                         </option>
@@ -589,9 +626,11 @@ const panelBgStyle: React.CSSProperties = {
 };
 
 const panelContainerStyle: React.CSSProperties = {
-  maxWidth: "460px",
+  maxWidth: "1000px",
   margin: "0 auto",
-  padding: "0 14px",
+  padding: "0 20px",
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const headerRowStyle: React.CSSProperties = {
@@ -628,8 +667,9 @@ const dropdownWidgetStyle: React.CSSProperties = {
 const filterSuiteContainerStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "10px",
+  gap: "12px",
   marginBottom: "24px",
+  width: "100%",
 };
 
 // Data Table Structure
@@ -639,16 +679,19 @@ const tableViewportOuterWrapper: React.CSSProperties = {
   borderRadius: "16px",
   overflow: "hidden",
   marginBottom: "24px",
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const scrollContainerIndicator: React.CSSProperties = {
   overflowX: "auto",
   WebkitOverflowScrolling: "touch",
+  width: "100%",
 };
 
 const mainDataTableLayout: React.CSSProperties = {
   width: "100%",
-  minWidth: "440px",
+  minWidth: "600px",
   borderCollapse: "collapse",
   textAlign: "left",
 };
@@ -706,24 +749,31 @@ const placedBadgeStyle: React.CSSProperties = {
 
 // Exact Utility Styling Tokens matching Property Matrix
 const utilityBadgeStyle: React.CSSProperties = {
-  display: "inline-block",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
   padding: "3px 8px",
   borderRadius: "8px",
-  fontSize: "0.7rem",
+  fontSize: "0.72rem",
   fontWeight: "700",
   backgroundColor: "#13232d",
   color: "#38bdf8",
   border: "1px solid #1e3a4b",
+  whiteSpace: "nowrap",
 };
 
 // Card & Form Layouts
 const formWrapperCardStyle: React.CSSProperties = {
-  backgroundColor: "#111111",
+  backgroundColor: "#141414",
   border: "1px solid #222",
   borderRadius: "20px",
   padding: "24px",
   marginBottom: "24px",
   boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
+  maxWidth: "1000px",
+  width: "100%",
+  margin: "0 auto 24px auto",
+  boxSizing: "border-box",
 };
 
 const formTitleStyle: React.CSSProperties = {

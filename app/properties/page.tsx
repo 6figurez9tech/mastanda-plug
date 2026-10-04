@@ -29,12 +29,15 @@ interface PropertyFormData {
 
 const CITIES = ["Harare", "Bulawayo", "Mutare", "Gweru"];
 const STATUSES = ["All statuses", "Available", "Occupied"];
-const ROOM_TYPES = [
-  "Single Room",
-  "1 Bedroom Apartment",
-  "2-Room Flat",
+const PROPERTY_TYPES = [
+  "Single Room / Bed Sitter",
   "Cottage",
+  "Apartment",
+  "Town House",
+  "Standalone House",
+  "Luxury Villa",
 ];
+const ROOM_TYPES = PROPERTY_TYPES;
 
 export default function PropertiesDashboard() {
   const [properties, setProperties] = useState<PropertyListing[]>([]);
@@ -52,7 +55,7 @@ export default function PropertiesDashboard() {
     whatsapp_number: "",
     city: "Harare",
     suburb: "",
-    room_type: "Single Room",
+    room_type: "Single Room / Bed Sitter",
     price: "",
     status: "Available",
   });
@@ -157,7 +160,7 @@ export default function PropertiesDashboard() {
       whatsapp_number: "",
       city: "Harare",
       suburb: "",
-      room_type: "Single Room",
+      room_type: "Single Room / Bed Sitter",
       price: "",
       status: "Available",
     });
@@ -249,7 +252,7 @@ export default function PropertiesDashboard() {
                 </span>
               </div>
               <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Room type</span>
+                <span style={metaFieldLabel}>Property type</span>
                 <span style={metaFieldValue}>{selectedProperty.room_type}</span>
               </div>
               <div style={metaFieldGroup}>
@@ -317,7 +320,7 @@ export default function PropertiesDashboard() {
               </div>
             </div>
 
-            {/* 4. Uniform Tracker Grid Filters: Search by name or ID, All statuses, All cities */}
+            {/* Filter Suite Controls */}
             <div className="filter-suite-responsive" style={filterSuiteContainerStyle}>
               <input
                 type="text"
@@ -354,13 +357,13 @@ export default function PropertiesDashboard() {
               </select>
             </div>
 
-            {/* 3. Wide Charcoal Matrix Grid Table: Unified #141414 Table Grid with Identical Column Maps */}
+            {/* 3. Wide Charcoal Matrix Grid Table: First Column Header PROPERTY TYPE */}
             <div style={tableViewportOuterWrapper}>
               <div style={scrollContainerIndicator}>
                 <table style={mainDataTableLayout}>
                   <thead>
                     <tr style={tableHeaderRowStyle}>
-                      <th style={thColumnHeadingStyle}>PROPERTY ↕</th>
+                      <th style={thColumnHeadingStyle}>PROPERTY TYPE ↕</th>
                       <th style={thColumnHeadingStyle}>LOCATION ↕</th>
                       <th style={thColumnHeadingStyle}>RENT ↕</th>
                       <th style={thColumnHeadingStyle}>UTILITIES ↕</th>
@@ -398,13 +401,19 @@ export default function PropertiesDashboard() {
                               style={{
                                 fontWeight: "bold",
                                 color: "#ffffff",
+                              }}
+                            >
+                              {item.room_type}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#888888",
+                                marginTop: "2px",
                                 textDecoration: "underline",
                               }}
                             >
                               PROP-{item.id.toString().padStart(3, "0")}
-                            </div>
-                            <div style={{ fontSize: "0.75rem", color: "#888888", marginTop: "2px" }}>
-                              {item.room_type}
                             </div>
                           </td>
                           <td style={tdCellStyle}>
@@ -451,7 +460,7 @@ export default function PropertiesDashboard() {
               </div>
             </div>
 
-            {/* 2. Global Feature Symmetry: Dark-themed #141414 Form Card Block */}
+            {/* 1 & 2. Form Card Block with Property type Label & Six Upgraded Classifications */}
             {showIntake && (
               <div style={formCardStyle}>
                 <h2 style={formTitleStyle}>Quick property intake</h2>
@@ -506,7 +515,7 @@ export default function PropertiesDashboard() {
                   </div>
 
                   <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Room type</label>
+                    <label style={labelStyle}>Property type</label>
                     <select
                       name="room_type"
                       value={formData.room_type}
@@ -514,7 +523,7 @@ export default function PropertiesDashboard() {
                       required
                       style={inputBoxStyle}
                     >
-                      {ROOM_TYPES.map(r => (
+                      {PROPERTY_TYPES.map(r => (
                         <option key={r} value={r}>
                           {r}
                         </option>
@@ -596,9 +605,9 @@ const panelBgStyle: React.CSSProperties = {
   padding: "24px 0 140px 0",
 };
 
-// 1. Layout Sizing Blueprint: Spacious widescreen layout grid with maxWidth: '1200px'
+// 4. Layout Sizing Blueprint Verification: maxWidth strictly '1000px'
 const appContainerStyle: React.CSSProperties = {
-  maxWidth: "1200px",
+  maxWidth: "1000px",
   margin: "0 auto",
   padding: "0 20px",
   width: "100%",
@@ -731,7 +740,7 @@ const utilityBadgeStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-// 2. Dark-Themed #141414 Form Card Container Block
+// Dark-Themed #141414 Form Card Container Block
 const formCardStyle: React.CSSProperties = {
   backgroundColor: "#141414",
   border: "1px solid #222",

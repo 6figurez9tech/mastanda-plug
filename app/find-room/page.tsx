@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../utils/supabaseClient";
+import Link from "next/link";
+import { useRouter } from 'next/navigation';
 
 interface TenantRequest {
   id: string | number;
@@ -41,6 +43,26 @@ const PROPERTY_TYPES = [
 const ROOM_TYPES = PROPERTY_TYPES;
 
 export default function TenantDashboard() {
+  const router = useRouter();
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  
+  // Theme state with localStorage persistence
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme !== null) {
+      setIsDarkMode(savedTheme === 'dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+  };
+
   const [tenants, setTenants] = useState<TenantRequest[]>([]);
   const [statusLoading, setStatusLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +86,8 @@ export default function TenantDashboard() {
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const brandTeal = "#217d9d";
 
   const fetchTenants = async () => {
     const { data, error } = await supabase
@@ -182,8 +206,378 @@ export default function TenantDashboard() {
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
   };
 
+  // Swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.changedTouches[0].screenX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].screenX;
+    handleSwipe();
+  };
+
+  const handleSwipe = () => {
+    const swipeThreshold = 50;
+    const diff = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swipe left - go to Matches
+        router.push('/matches');
+      } else {
+        // Swipe right - go to Properties
+        router.push('/properties');
+      }
+    }
+  };
+
+  // Theme-aware style helpers
+  const getPanelBgStyle = () => ({
+    fontFamily: "sans-serif",
+    backgroundColor: isDarkMode ? "#0d0d0d" : "#f8f9fa",
+    color: isDarkMode ? "#ffffff" : "#212529",
+    minHeight: "100vh",
+    padding: "16px 0 100px 0",
+  });
+
+  const getPanelContainerStyle = () => ({
+    maxWidth: "430px",
+    margin: "0 auto",
+    padding: "0 16px",
+    width: "100%",
+    boxSizing: "border-box",
+    position: "relative",
+  });
+
+  const getHeaderRowStyle = () => ({
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  });
+
+  const getTitleStyle = () => ({
+    margin: 0,
+    fontSize: "1.4rem",
+    fontWeight: "800",
+  });
+
+  const getSearchBarFieldStyle = () => ({
+    boxSizing: "border-box",
+    width: "100%",
+    padding: "12px 16px",
+    backgroundColor: isDarkMode ? "#111111" : "#f1f3f5",
+    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
+    borderRadius: "24px",
+    color: isDarkMode ? "#ffffff" : "#212529",
+    fontSize: "0.95rem",
+    outline: "none",
+  });
+
+  const getDropdownWidgetStyle = () => ({
+    ...getSearchBarFieldStyle(),
+    appearance: "none",
+  });
+
+  const getFilterSuiteContainerStyle = () => ({
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    marginBottom: "24px",
+    width: "100%",
+  });
+
+  const getTableViewportOuterWrapper = () => ({
+    backgroundColor: isDarkMode ? "#141414" : "#ffffff",
+    border: isDarkMode ? "1px solid #1f1f1f" : "1px solid #e9ecef",
+    borderRadius: "16px",
+    overflow: "hidden",
+    marginBottom: "24px",
+    width: "100%",
+    boxSizing: "border-box",
+  });
+
+  const getScrollContainerIndicator = () => ({
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+    width: "100%",
+  });
+
+  const getMainDataTableLayout = () => ({
+    width: "100%",
+    minWidth: "600px",
+    borderCollapse: "collapse",
+    textAlign: "left",
+  });
+
+  const getTableHeaderRowStyle = () => ({
+    backgroundColor: isDarkMode ? "#161616" : "#f8f9fa",
+    borderBottom: isDarkMode ? "1px solid #1f1f1f" : "1px solid #e9ecef",
+  });
+
+  const getThColumnHeadingStyle = () => ({
+    padding: "12px 14px",
+    fontSize: "0.75rem",
+    fontWeight: "700",
+    color: isDarkMode ? "#777777" : "#6c757d",
+    textTransform: "uppercase",
+  });
+
+  const getTableRowStyle = () => ({
+    borderBottom: isDarkMode ? "1px solid #161616" : "1px solid #e9ecef",
+    cursor: "pointer",
+  });
+
+  const getTdCellStyle = () => ({
+    padding: "14px",
+    fontSize: "0.85rem",
+    color: isDarkMode ? "#cccccc" : "#495057",
+  });
+
+  const getBaseBadgeStyle = () => ({
+    display: "inline-block",
+    padding: "4px 12px",
+    borderRadius: "12px",
+    fontSize: "0.75rem",
+    fontWeight: "700",
+  });
+
+  const getSearchingBadgeStyle = () => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: "#3a230f",
+    color: "#f59e0b",
+  });
+
+  const getMatchedBadgeStyle = () => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: "#181b3d",
+    color: "#6366f1",
+  });
+
+  const getPlacedBadgeStyle = () => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: "#132f1d",
+    color: "#10b981",
+  });
+
+  const getUtilityBadgeStyle = () => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "3px 8px",
+    borderRadius: "8px",
+    fontSize: "0.72rem",
+    fontWeight: "700",
+    backgroundColor: "#13232d",
+    color: "#38bdf8",
+    border: "1px solid #1e3a4b",
+    whiteSpace: "nowrap",
+  });
+
+  const getFormWrapperCardStyle = () => ({
+    backgroundColor: isDarkMode ? "#141414" : "#ffffff",
+    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
+    borderRadius: "20px",
+    padding: "24px",
+    marginBottom: "24px",
+    boxShadow: isDarkMode ? "0 10px 15px -3px rgba(0,0,0,0.3)" : "0 10px 15px -3px rgba(0,0,0,0.1)",
+    width: "100%",
+    boxSizing: "border-box",
+  });
+
+  const getFormTitleStyle = () => ({
+    margin: "0 0 4px 0",
+    color: isDarkMode ? "#ffffff" : "#212529",
+    fontSize: "1.4rem",
+    fontWeight: "800",
+  });
+
+  const getFormSubtitleStyle = () => ({
+    margin: "0 0 20px 0",
+    color: isDarkMode ? "#888888" : "#6c757d",
+    fontSize: "0.85rem",
+    lineHeight: "1.4",
+  });
+
+  const getFormGridStructure = () => ({
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  });
+
+  const getFieldBlockStyle = () => ({
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  });
+
+  const getLabelStyle = () => ({
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    color: isDarkMode ? "#ffffff" : "#212529",
+  });
+
+  const getInputBoxStyle = () => ({
+    boxSizing: "border-box",
+    width: "100%",
+    padding: "12px",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#f1f3f5",
+    border: isDarkMode ? "1px solid #2a2a2a" : "1px solid #e9ecef",
+    borderRadius: "10px",
+    color: isDarkMode ? "#fff" : "#212529",
+    fontSize: "0.95rem",
+    outline: "none",
+  });
+
+  const getInputHelpTextStyle = () => ({
+    marginTop: "2px",
+    color: isDarkMode ? "#666666" : "#6c757d",
+    fontSize: "0.75rem",
+  });
+
+  const getUtilityCardBoxStyle = () => ({
+    backgroundColor: isDarkMode ? "#0d0d0d" : "#f8f9fa",
+    padding: "14px",
+    borderRadius: "10px",
+    border: isDarkMode ? "1px solid #222222" : "1px solid #e9ecef",
+  });
+
+  const getCheckboxLabelStyle = () => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    color: isDarkMode ? "#e5e7eb" : "#212529",
+    fontSize: "0.85rem",
+    marginBottom: "10px",
+    cursor: "pointer",
+  });
+
+  const getCheckboxStyle = () => ({
+    width: "16px",
+    height: "16px",
+    accentColor: "#217d9d",
+    cursor: "pointer",
+  });
+
+  const getBaseButtonStyle = () => ({
+    display: "block",
+    width: "100%",
+    padding: "14px",
+    border: "none",
+    borderRadius: "24px",
+    fontSize: "0.95rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    textAlign: "center",
+  });
+
+  const getSubmitPillBtnStyle = () => ({
+    ...getBaseButtonStyle(),
+    backgroundColor: "#217d9d",
+    color: "#ffffff",
+  });
+
+  const getMessageTenantPillBtn = () => ({
+    ...getBaseButtonStyle(),
+    display: "inline-block",
+    width: "auto",
+    padding: "10px 20px",
+    backgroundColor: "#217d9d",
+    color: "#ffffff",
+    textDecoration: "none",
+    fontSize: "0.85rem",
+  });
+
+  const getCloseDetailPanelBtn = () => ({
+    ...getBaseButtonStyle(),
+    padding: "12px",
+    backgroundColor: isDarkMode ? "#222" : "#e9ecef",
+    color: isDarkMode ? "#fff" : "#212529",
+    borderRadius: "20px",
+    fontWeight: "600",
+    fontSize: "0.9rem",
+  });
+
+  const getDetailInnerCardBoxStyle = () => ({
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+    backgroundColor: isDarkMode ? "#141414" : "#ffffff",
+    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
+    borderRadius: "18px",
+    padding: "20px",
+    marginBottom: "24px",
+  });
+
+  const getMetaFieldGroup = () => ({
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  });
+
+  const getMetaFieldLabel = () => ({
+    fontSize: "0.8rem",
+    fontWeight: "600",
+    color: isDarkMode ? "#555555" : "#6c757d",
+  });
+
+  const getMetaFieldValue = () => ({
+    fontSize: "0.92rem",
+    fontWeight: "700",
+    color: isDarkMode ? "#ffffff" : "#212529",
+  });
+
+  const getNavDockStyle = () => ({
+    position: "fixed",
+    bottom: "24px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "calc(100% - 32px)",
+    maxWidth: "380px",
+    borderRadius: "30px",
+    padding: "8px 12px",
+    display: "flex",
+    justifyContent: "space-around",
+    alignItems: "center",
+    zIndex: 9999,
+    boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    backgroundColor: isDarkMode ? "rgba(26, 26, 26, 0.8)" : "rgba(255, 255, 255, 0.85)",
+    border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.05)",
+  });
+
+  const getNavTabStyle = (isActive: boolean) => ({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "4px",
+    textDecoration: "none",
+    color: isActive ? brandTeal : isDarkMode ? "#666" : "#6c757d",
+    cursor: "pointer",
+    transition: "color 0.2s ease",
+    padding: isActive ? "6px 16px" : "6px 12px",
+    borderRadius: "20px",
+    backgroundColor: isActive 
+      ? (isDarkMode ? "rgba(33, 125, 157, 0.15)" : "rgba(33, 125, 157, 0.1)")
+      : "transparent",
+  });
+
+  const getNavIconStyle = () => ({
+    fontSize: "1.4rem",
+  });
+
+  const getNavLabelStyle = () => ({
+    fontSize: "0.7rem",
+    fontWeight: "600",
+  });
+
   return (
-    <div style={panelBgStyle}>
+    <div 
+      style={getPanelBgStyle()}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <style>{`
         .filter-suite-responsive {
           display: flex;
@@ -192,24 +586,10 @@ export default function TenantDashboard() {
           margin-bottom: 24px;
           width: 100%;
         }
-        @media (min-width: 768px) {
-          .filter-suite-responsive {
-            flex-direction: row;
-            align-items: center;
-          }
-          .filter-search-box {
-            flex: 2;
-          }
-          .filter-dropdown-box {
-            flex: 1;
-            min-width: 180px;
-          }
-        }
       `}</style>
-      <div style={panelContainerStyle}>
+      <div style={getPanelContainerStyle()}>
         {selectedTenant ? (
-          /* SINGLE PROFILE VIEWER SHEET MODAL LAYER */
-          <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+          <div style={{ maxWidth: "430px", margin: "0 auto" }}>
             <div
               style={{
                 display: "flex",
@@ -217,19 +597,19 @@ export default function TenantDashboard() {
                 alignItems: "center",
                 marginBottom: "24px",
                 paddingBottom: "12px",
-                borderBottom: "1px solid #222",
+                borderBottom: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
               }}
             >
               <div>
-                <span style={{ fontSize: "0.8rem", color: "#666", fontWeight: "bold" }}>
+                <span style={{ fontSize: "0.8rem", color: isDarkMode ? "#666" : "#6c757d", fontWeight: "bold" }}>
                   Tenants
                 </span>
                 <h2
                   style={{
-                    fontSize: "1.2rem",
+                    fontSize: "1.4rem",
                     fontWeight: "800",
                     margin: "4px 0 0 0",
-                    color: "#ffffff",
+                    color: isDarkMode ? "#ffffff" : "#212529",
                   }}
                 >
                   TEN-{selectedTenant.id.toString().padStart(3, "0")} · {selectedTenant.name}
@@ -242,105 +622,117 @@ export default function TenantDashboard() {
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={messageTenantPillBtn}
+                style={getMessageTenantPillBtn()}
               >
                 Message tenant
               </a>
             </div>
 
-            <div style={detailInnerCardBoxStyle}>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Search location</span>
-                <span style={metaFieldValue}>
+            <div style={getDetailInnerCardBoxStyle()}>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Search location</span>
+                <span style={getMetaFieldValue()}>
                   {selectedTenant.preferred_suburb ? `${selectedTenant.preferred_suburb}, ` : ""}
                   {selectedTenant.city}
                 </span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Property type</span>
-                <span style={metaFieldValue}>{selectedTenant.room_type_wanted}</span>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Property type</span>
+                <span style={getMetaFieldValue()}>{selectedTenant.room_type_wanted}</span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Minimum bedrooms</span>
-                <span style={metaFieldValue}>1</span>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Minimum bedrooms</span>
+                <span style={getMetaFieldValue()}>1</span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Maximum budget</span>
-                <span style={{ ...metaFieldValue, color: "#10b981" }}>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Maximum budget</span>
+                <span style={{ ...getMetaFieldValue(), color: "#10b981" }}>
                   ${selectedTenant.max_price}/month
                 </span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Profile status</span>
-                <span style={metaFieldValue}>{selectedTenant.status}</span>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Profile status</span>
+                <span style={getMetaFieldValue()}>{selectedTenant.status}</span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>WhatsApp</span>
-                <span style={{ ...metaFieldValue, color: "#38bdf8" }}>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>WhatsApp</span>
+                <span style={{ ...getMetaFieldValue(), color: "#38bdf8" }}>
                   +{selectedTenant.whatsapp_number}
                 </span>
               </div>
-              <div style={metaFieldGroup}>
-                <span style={metaFieldLabel}>Utilities requested</span>
+              <div style={getMetaFieldGroup()}>
+                <span style={getMetaFieldLabel()}>Utilities requested</span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
                   {selectedTenant.needs_borehole && (
-                    <span style={utilityBadgeStyle}>🚰 Borehole</span>
+                    <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
                   )}
                   {selectedTenant.needs_municipal_water && (
-                    <span style={utilityBadgeStyle}>🏢 Council</span>
+                    <span style={getUtilityBadgeStyle()}>🏢 Council</span>
                   )}
                   {selectedTenant.needs_solar_backup && (
-                    <span style={utilityBadgeStyle}>💡 Solar</span>
+                    <span style={getUtilityBadgeStyle()}>💡 Solar</span>
                   )}
                   {!selectedTenant.needs_borehole &&
                     !selectedTenant.needs_municipal_water &&
                     !selectedTenant.needs_solar_backup && (
-                      <span style={{ color: "#777", fontSize: "0.85rem" }}>None requested</span>
+                      <span style={{ color: isDarkMode ? "#777" : "#6c757d", fontSize: "0.85rem" }}>None requested</span>
                     )}
                 </div>
               </div>
             </div>
-            <div onClick={() => setSelectedTenant(null)} style={closeDetailPanelBtn}>
+            <div onClick={() => setSelectedTenant(null)} style={getCloseDetailPanelBtn()}>
               ← Back to Tenant Grid
             </div>
           </div>
         ) : (
-          /* DYNAMIC HORIZONTAL SEARCH ROW MATRIX */
           <>
-            <div style={headerRowStyle}>
-              <h1 style={titleStyle}>Tenants</h1>
-              <div
-                onClick={() => setShowForm(!showForm)}
-                style={{
-                  backgroundColor: showForm ? "#1f2937" : "#217d9d",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "10px 18px",
-                  borderRadius: "24px",
-                  fontWeight: "700",
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s ease",
-                }}
-              >
-                {showForm ? "✕ Close Intake" : "＋ Register tenant"}
+            <div style={getHeaderRowStyle()}>
+              <h1 style={getTitleStyle()}>Tenants</h1>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <div
+                  onClick={() => setShowForm(!showForm)}
+                  style={{
+                    backgroundColor: showForm ? (isDarkMode ? "#1f2937" : "#e9ecef") : "#217d9d",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "10px 18px",
+                    borderRadius: "24px",
+                    fontWeight: "700",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease",
+                  }}
+                >
+                  {showForm ? "✕ Close Intake" : "＋ Register tenant"}
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    fontSize: "1.2rem",
+                    cursor: "pointer",
+                    padding: "4px",
+                  }}
+                >
+                  {isDarkMode ? "☀️" : "🌙"}
+                </button>
               </div>
             </div>
 
-            {/* FILTER ROW MATRIX */}
-            <div className="filter-suite-responsive" style={filterSuiteContainerStyle}>
+            <div className="filter-suite-responsive" style={getFilterSuiteContainerStyle()}>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Search by name or ID"
-                style={searchBarFieldStyle}
+                style={getSearchBarFieldStyle()}
                 className="filter-search-box"
               />
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
-                style={dropdownWidgetStyle}
+                style={getDropdownWidgetStyle()}
                 className="filter-dropdown-box"
               >
                 {STATUSES.map(s => (
@@ -352,7 +744,7 @@ export default function TenantDashboard() {
               <select
                 value={filterCity}
                 onChange={e => setFilterCity(e.target.value)}
-                style={dropdownWidgetStyle}
+                style={getDropdownWidgetStyle()}
                 className="filter-dropdown-box"
               >
                 <option value="All cities">All cities</option>
@@ -364,18 +756,17 @@ export default function TenantDashboard() {
               </select>
             </div>
 
-            {/* TABLE LIST VIEWPORT */}
-            <div style={tableViewportOuterWrapper}>
-              <div style={scrollContainerIndicator}>
-                <table style={mainDataTableLayout}>
+            <div style={getTableViewportOuterWrapper()}>
+              <div style={getScrollContainerIndicator()}>
+                <table style={getMainDataTableLayout()}>
                   <thead>
-                    <tr style={tableHeaderRowStyle}>
-                      <th style={thColumnHeadingStyle}>Tenant ↕</th>
-                      <th style={thColumnHeadingStyle}>Location ↕</th>
-                      <th style={thColumnHeadingStyle}>PROPERTY TYPE ↕</th>
-                      <th style={thColumnHeadingStyle}>Budget ↕</th>
-                      <th style={thColumnHeadingStyle}>UTILITIES ↕</th>
-                      <th style={thColumnHeadingStyle}>Status ↕</th>
+                    <tr style={getTableHeaderRowStyle()}>
+                      <th style={getThColumnHeadingStyle()}>Tenant ↕</th>
+                      <th style={getThColumnHeadingStyle()}>Location ↕</th>
+                      <th style={getThColumnHeadingStyle()}>PROPERTY TYPE ↕</th>
+                      <th style={getThColumnHeadingStyle()}>Budget ↕</th>
+                      <th style={getThColumnHeadingStyle()}>UTILITIES ↕</th>
+                      <th style={getThColumnHeadingStyle()}>Status ↕</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -383,7 +774,7 @@ export default function TenantDashboard() {
                       <tr>
                         <td
                           colSpan={6}
-                          style={{ padding: "20px", color: "#666", textAlign: "center" }}
+                          style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           Loading...
                         </td>
@@ -392,7 +783,7 @@ export default function TenantDashboard() {
                       <tr>
                         <td
                           colSpan={6}
-                          style={{ padding: "20px", color: "#666", textAlign: "center" }}
+                          style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           No active records found.
                         </td>
@@ -402,58 +793,60 @@ export default function TenantDashboard() {
                         <tr
                           key={item.id}
                           onClick={() => setSelectedTenant(item)}
-                          style={tableRowStyle}
+                          style={getTableRowStyle()}
                         >
                           <td
                             style={{
-                              ...tdCellStyle,
-                              fontWeight: "bold",
-                              color: "#fff",
+                              ...getTdCellStyle(),
+                              fontWeight: "700",
+                              color: isDarkMode ? "#fff" : "#212529",
                               textDecoration: "underline",
                             }}
                           >
                             {item.name}
                           </td>
-                          <td style={tdCellStyle}>
-                            {item.preferred_suburb ? `${item.preferred_suburb}, ` : ""}{item.city}
+                          <td style={getTdCellStyle()}>
+                            <span style={{ fontWeight: "700", color: isDarkMode ? "#ffffff" : "#212529" }}>
+                              {item.preferred_suburb ? `${item.preferred_suburb}, ` : ""}{item.city}
+                            </span>
                           </td>
-                          <td style={tdCellStyle}>
+                          <td style={getTdCellStyle()}>
                             <div
                               style={{
-                                fontWeight: "bold",
-                                color: "#ffffff",
+                                fontWeight: "700",
+                                color: isDarkMode ? "#ffffff" : "#212529",
                               }}
                             >
                               {item.room_type_wanted}
                             </div>
                           </td>
-                          <td style={tdCellStyle}>${item.max_price}/mo</td>
-                          <td style={tdCellStyle}>
+                          <td style={{ ...getTdCellStyle(), fontWeight: "700" }}>${item.max_price}/mo</td>
+                          <td style={getTdCellStyle()}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {item.needs_borehole && (
-                                <span style={utilityBadgeStyle}>🚰 Borehole</span>
+                                <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
                               )}
                               {item.needs_municipal_water && (
-                                <span style={utilityBadgeStyle}>🏢 Council</span>
+                                <span style={getUtilityBadgeStyle()}>🏢 Council</span>
                               )}
                               {item.needs_solar_backup && (
-                                <span style={utilityBadgeStyle}>💡 Solar</span>
+                                <span style={getUtilityBadgeStyle()}>💡 Solar</span>
                               )}
                               {!item.needs_borehole &&
                                 !item.needs_municipal_water &&
                                 !item.needs_solar_backup && (
-                                  <span style={{ color: "#666", fontSize: "0.75rem" }}>—</span>
+                                  <span style={{ color: isDarkMode ? "#666" : "#6c757d", fontSize: "0.75rem" }}>—</span>
                                 )}
                             </div>
                           </td>
-                          <td style={tdCellStyle}>
+                          <td style={getTdCellStyle()}>
                             <span
                               style={
                                 item.status === "Matched"
-                                  ? matchedBadgeStyle
+                                  ? getMatchedBadgeStyle()
                                   : item.status === "Placed"
-                                  ? placedBadgeStyle
-                                  : searchingBadgeStyle
+                                  ? getPlacedBadgeStyle()
+                                  : getSearchingBadgeStyle()
                               }
                             >
                               {item.status || "Searching"}
@@ -467,17 +860,16 @@ export default function TenantDashboard() {
               </div>
             </div>
 
-            {/* UPGRADED INTAKE PANEL FORM BOX */}
             {showForm && (
-              <div style={formWrapperCardStyle}>
-                <h2 style={formTitleStyle}>Quick tenant intake</h2>
-                <p style={formSubtitleStyle}>
+              <div style={getFormWrapperCardStyle()}>
+                <h2 style={getFormTitleStyle()}>Quick tenant intake</h2>
+                <p style={getFormSubtitleStyle()}>
                   Capture a WhatsApp enquiry and add it to the matching queue.
                 </p>
 
-                <form onSubmit={handleFormSubmit} style={formGridStructure}>
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Full name</label>
+                <form onSubmit={handleFormSubmit} style={getFormGridStructure()}>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Full name</label>
                     <input
                       type="text"
                       name="name"
@@ -485,12 +877,12 @@ export default function TenantDashboard() {
                       onChange={handleInputChange}
                       placeholder="e.g. Sarah Khumalo"
                       required
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     />
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>WhatsApp number</label>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>WhatsApp number</label>
                     <input
                       type="tel"
                       name="whatsapp_number"
@@ -498,21 +890,21 @@ export default function TenantDashboard() {
                       onChange={handleInputChange}
                       placeholder="e.g. 0771234567"
                       required
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     />
-                    <span style={inputHelpTextStyle}>
+                    <span style={getInputHelpTextStyle()}>
                       Include the leading 0, e.g. 0771234567
                     </span>
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Target city</label>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Target city</label>
                     <select
                       name="city"
                       value={formData.city}
                       onChange={handleInputChange}
                       required
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     >
                       {CITIES.map(c => (
                         <option key={c} value={c}>
@@ -522,26 +914,26 @@ export default function TenantDashboard() {
                     </select>
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Target suburb or area</label>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Target suburb or area</label>
                     <input
                       type="text"
                       name="preferred_suburb"
                       value={formData.preferred_suburb}
                       onChange={handleInputChange}
                       placeholder="e.g. Avondale (optional)"
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     />
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Property type</label>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Property type</label>
                     <select
                       name="room_type_wanted"
                       value={formData.room_type_wanted}
                       onChange={handleInputChange}
                       required
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     >
                       {PROPERTY_TYPES.map(r => (
                         <option key={r} value={r}>
@@ -551,8 +943,8 @@ export default function TenantDashboard() {
                     </select>
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label style={labelStyle}>Maximum monthly budget (USD)</label>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Maximum monthly budget (USD)</label>
                     <input
                       type="number"
                       name="max_price"
@@ -562,36 +954,35 @@ export default function TenantDashboard() {
                       min="0"
                       step="1"
                       required
-                      style={inputBoxStyle}
+                      style={getInputBoxStyle()}
                     />
                   </div>
 
-                  {/* THREE UTILITY PARAMETERS CHECKBOX CARD */}
-                  <div style={utilityCardBoxStyle}>
-                    <label style={checkboxLabelStyle}>
+                  <div style={getUtilityCardBoxStyle()}>
+                    <label style={getCheckboxLabelStyle()}>
                       <input
                         type="checkbox"
                         checked={needs_borehole}
                         onChange={e => setNeedsBorehole(e.target.checked)}
-                        style={checkboxStyle}
+                        style={getCheckboxStyle()}
                       />
                       Borehole clean water source
                     </label>
-                    <label style={checkboxLabelStyle}>
+                    <label style={getCheckboxLabelStyle()}>
                       <input
                         type="checkbox"
                         checked={needs_municipal_water}
                         onChange={e => setNeedsMunicipalWater(e.target.checked)}
-                        style={checkboxStyle}
+                        style={getCheckboxStyle()}
                       />
                       Council municipal water line
                     </label>
-                    <label style={{ ...checkboxLabelStyle, marginBottom: 0 }}>
+                    <label style={{ ...getCheckboxLabelStyle(), marginBottom: 0 }}>
                       <input
                         type="checkbox"
                         checked={needs_solar_backup}
                         onChange={e => setNeedsSolarBackup(e.target.checked)}
-                        style={checkboxStyle}
+                        style={getCheckboxStyle()}
                       />
                       Constant solar electrical backup
                     </label>
@@ -603,7 +994,7 @@ export default function TenantDashboard() {
                     </div>
                   )}
 
-                  <button type="submit" style={submitPillBtnStyle}>
+                  <button type="submit" style={getSubmitPillBtnStyle()}>
                     Save tenant profile
                   </button>
                 </form>
@@ -612,310 +1003,22 @@ export default function TenantDashboard() {
           </>
         )}
       </div>
+
+      {/* Floating Navigation Dock */}
+      <div style={getNavDockStyle()}>
+        <Link href="/matches" style={getNavTabStyle(false)}>
+          <span style={getNavIconStyle()}>⚡</span>
+          <span style={getNavLabelStyle()}>Matches</span>
+        </Link>
+        <Link href="/properties" style={getNavTabStyle(false)}>
+          <span style={getNavIconStyle()}>🏠</span>
+          <span style={getNavLabelStyle()}>Properties</span>
+        </Link>
+        <Link href="/find-room" style={getNavTabStyle(true)}>
+          <span style={getNavIconStyle()}>👥</span>
+          <span style={getNavLabelStyle()}>Tenants</span>
+        </Link>
+      </div>
     </div>
   );
 }
-
-// Global Theme/Layout
-const panelBgStyle: React.CSSProperties = {
-  fontFamily: "sans-serif",
-  backgroundColor: "#0d0d0d",
-  color: "#ffffff",
-  minHeight: "100vh",
-  padding: "24px 0 140px 0",
-};
-
-const panelContainerStyle: React.CSSProperties = {
-  maxWidth: "1000px",
-  margin: "0 auto",
-  padding: "0 20px",
-  width: "100%",
-  boxSizing: "border-box",
-};
-
-const headerRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "20px",
-};
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "1.6rem",
-  fontWeight: "800",
-};
-
-// Form Fields & Controls
-const searchBarFieldStyle: React.CSSProperties = {
-  boxSizing: "border-box",
-  width: "100%",
-  padding: "12px 16px",
-  backgroundColor: "#111111",
-  border: "1px solid #222",
-  borderRadius: "24px",
-  color: "#ffffff",
-  fontSize: "0.95rem",
-  outline: "none",
-};
-
-const dropdownWidgetStyle: React.CSSProperties = {
-  ...searchBarFieldStyle,
-  appearance: "none",
-};
-
-const filterSuiteContainerStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
-  marginBottom: "24px",
-  width: "100%",
-};
-
-// Data Table Structure
-const tableViewportOuterWrapper: React.CSSProperties = {
-  backgroundColor: "#141414",
-  border: "1px solid #1f1f1f",
-  borderRadius: "16px",
-  overflow: "hidden",
-  marginBottom: "24px",
-  width: "100%",
-  boxSizing: "border-box",
-};
-
-const scrollContainerIndicator: React.CSSProperties = {
-  overflowX: "auto",
-  WebkitOverflowScrolling: "touch",
-  width: "100%",
-};
-
-const mainDataTableLayout: React.CSSProperties = {
-  width: "100%",
-  minWidth: "600px",
-  borderCollapse: "collapse",
-  textAlign: "left",
-};
-
-const tableHeaderRowStyle: React.CSSProperties = {
-  backgroundColor: "#161616",
-  borderBottom: "1px solid #1f1f1f",
-};
-
-const thColumnHeadingStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  fontSize: "0.75rem",
-  fontWeight: "700",
-  color: "#777777",
-  textTransform: "uppercase",
-};
-
-const tableRowStyle: React.CSSProperties = {
-  borderBottom: "1px solid #161616",
-  cursor: "pointer",
-};
-
-const tdCellStyle: React.CSSProperties = {
-  padding: "14px",
-  fontSize: "0.85rem",
-  color: "#cccccc",
-};
-
-// Status Badges (Base & Variants)
-const baseBadgeStyle: React.CSSProperties = {
-  display: "inline-block",
-  padding: "4px 12px",
-  borderRadius: "12px",
-  fontSize: "0.75rem",
-  fontWeight: "700",
-};
-
-const searchingBadgeStyle: React.CSSProperties = {
-  ...baseBadgeStyle,
-  backgroundColor: "#3a230f",
-  color: "#f59e0b",
-};
-
-const matchedBadgeStyle: React.CSSProperties = {
-  ...baseBadgeStyle,
-  backgroundColor: "#181b3d",
-  color: "#6366f1",
-};
-
-const placedBadgeStyle: React.CSSProperties = {
-  ...baseBadgeStyle,
-  backgroundColor: "#132f1d",
-  color: "#10b981",
-};
-
-// Exact Utility Styling Tokens matching Property Matrix
-const utilityBadgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "4px",
-  padding: "3px 8px",
-  borderRadius: "8px",
-  fontSize: "0.72rem",
-  fontWeight: "700",
-  backgroundColor: "#13232d",
-  color: "#38bdf8",
-  border: "1px solid #1e3a4b",
-  whiteSpace: "nowrap",
-};
-
-// Card & Form Layouts
-const formWrapperCardStyle: React.CSSProperties = {
-  backgroundColor: "#141414",
-  border: "1px solid #222",
-  borderRadius: "20px",
-  padding: "24px",
-  marginBottom: "24px",
-  boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
-  maxWidth: "1000px",
-  width: "100%",
-  margin: "0 auto 24px auto",
-  boxSizing: "border-box",
-};
-
-const formTitleStyle: React.CSSProperties = {
-  margin: "0 0 4px 0",
-  color: "#ffffff",
-  fontSize: "1.25rem",
-  fontWeight: "800",
-};
-
-const formSubtitleStyle: React.CSSProperties = {
-  margin: "0 0 20px 0",
-  color: "#888888",
-  fontSize: "0.85rem",
-  lineHeight: "1.4",
-};
-
-const formGridStructure: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "16px",
-};
-
-const fieldBlockStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: "0.85rem",
-  fontWeight: "600",
-  color: "#ffffff",
-};
-
-const inputBoxStyle: React.CSSProperties = {
-  boxSizing: "border-box",
-  width: "100%",
-  padding: "12px",
-  backgroundColor: "#1e1e1e",
-  border: "1px solid #2a2a2a",
-  borderRadius: "10px",
-  color: "#fff",
-  fontSize: "0.95rem",
-  outline: "none",
-};
-
-const inputHelpTextStyle: React.CSSProperties = {
-  marginTop: "2px",
-  color: "#666666",
-  fontSize: "0.75rem",
-};
-
-const utilityCardBoxStyle: React.CSSProperties = {
-  backgroundColor: "#0d0d0d",
-  padding: "14px",
-  borderRadius: "10px",
-  border: "1px solid #222222",
-};
-
-const checkboxLabelStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  color: "#e5e7eb",
-  fontSize: "0.85rem",
-  marginBottom: "10px",
-  cursor: "pointer",
-};
-
-const checkboxStyle: React.CSSProperties = {
-  width: "16px",
-  height: "16px",
-  accentColor: "#217d9d",
-  cursor: "pointer",
-};
-
-// Buttons & Actions
-const baseButtonStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: "14px",
-  border: "none",
-  borderRadius: "24px",
-  fontSize: "0.95rem",
-  fontWeight: "700",
-  cursor: "pointer",
-  textAlign: "center",
-};
-
-const submitPillBtnStyle: React.CSSProperties = {
-  ...baseButtonStyle,
-  backgroundColor: "#217d9d",
-  color: "#ffffff",
-};
-
-const messageTenantPillBtn: React.CSSProperties = {
-  ...baseButtonStyle,
-  display: "inline-block",
-  width: "auto",
-  padding: "10px 20px",
-  backgroundColor: "#217d9d",
-  color: "#ffffff",
-  textDecoration: "none",
-  fontSize: "0.85rem",
-};
-
-const closeDetailPanelBtn: React.CSSProperties = {
-  ...baseButtonStyle,
-  padding: "12px",
-  backgroundColor: "#222",
-  color: "#fff",
-  borderRadius: "20px",
-  fontWeight: "600",
-  fontSize: "0.9rem",
-};
-
-// Detail Displays
-const detailInnerCardBoxStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "20px",
-  backgroundColor: "#141414",
-  border: "1px solid #222",
-  borderRadius: "18px",
-  padding: "20px",
-  marginBottom: "24px",
-};
-
-const metaFieldGroup: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-};
-
-const metaFieldLabel: React.CSSProperties = {
-  fontSize: "0.8rem",
-  fontWeight: "600",
-  color: "#555555",
-};
-
-const metaFieldValue: React.CSSProperties = {
-  fontSize: "1.05rem",
-  fontWeight: "700",
-  color: "#ffffff",
-};

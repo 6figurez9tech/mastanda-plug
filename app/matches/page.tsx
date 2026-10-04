@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Listing {
   id: string | number;
@@ -26,6 +27,26 @@ interface TenantRequest {
 const CITIES = ['Harare', 'Bulawayo', 'Mutare', 'Gweru'];
 
 export default function Matches() {
+  const router = useRouter();
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  
+  // Theme state with localStorage persistence
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme !== null) {
+      setIsDarkMode(savedTheme === 'dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+  };
+
   const [city, setCity] = useState('');
   const [listings, setListings] = useState<Listing[]>([]);
   const [requests, setRequests] = useState<TenantRequest[]>([]);
@@ -74,42 +95,327 @@ export default function Matches() {
     return Math.min(baseScore, 100);
   };
 
+  // Swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.changedTouches[0].screenX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].screenX;
+    handleSwipe();
+  };
+
+  const handleSwipe = () => {
+    const swipeThreshold = 50;
+    const diff = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swipe left - go to Properties
+        router.push('/properties');
+      } else {
+        // Swipe right - go to Tenants
+        router.push('/find-room');
+      }
+    }
+  };
+
+  // Theme-aware style helpers
+  const getAppBgStyle = () => ({
+    backgroundColor: isDarkMode ? '#0d0d0d' : '#f8f9fa',
+    minHeight: '100vh',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    padding: '16px 0 100px 0',
+    fontFamily: 'sans-serif',
+  });
+
+  const getAppContainerStyle = () => ({
+    maxWidth: '430px',
+    margin: '0 auto',
+    padding: '0 16px',
+    position: 'relative',
+  });
+
+  const getTitleStyle = () => ({
+    fontSize: '1.4rem',
+    fontWeight: '800',
+    margin: 0,
+    letterSpacing: '-0.3px',
+  });
+
+  const getAutoMatchBtnStyle = () => ({
+    borderRadius: '20px',
+    padding: '6px 14px',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: brandTeal,
+    backgroundColor: brandDarkTealbg,
+  });
+
+  const getFilterBoxStyle = () => ({
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    border: isDarkMode ? '1px solid #222222' : '1px solid #e9ecef',
+    padding: '14px',
+    borderRadius: '16px',
+    margin: '20px 0',
+  });
+
+  const getFilterLabelStyle = () => ({
+    display: 'block',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    color: isDarkMode ? '#666' : '#6c757d',
+    marginBottom: '6px',
+    letterSpacing: '0.3px',
+  });
+
+  const getSelectInputStyle = () => ({
+    display: 'block',
+    width: '100%',
+    padding: '12px',
+    borderRadius: '10px',
+    backgroundColor: isDarkMode ? '#1a1a1a' : '#f1f3f5',
+    border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e9ecef',
+    color: isDarkMode ? '#fff' : '#212529',
+    outline: 'none',
+    fontSize: '0.95rem',
+  });
+
+  const getTabSwitcherGrid = () => ({
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '6px',
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    padding: '4px',
+    borderRadius: '12px',
+    border: isDarkMode ? '1px solid #222222' : '1px solid #e9ecef',
+    marginBottom: '20px',
+  });
+
+  const getInactiveToggleBtnStyle = () => ({
+    padding: '10px 6px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: isDarkMode ? '#666666' : '#6c757d',
+    borderRadius: '8px',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  });
+
+  const getActiveToggleBtnStyle = () => ({
+    ...getInactiveToggleBtnStyle(),
+    color: '#ffffff',
+    backgroundColor: isDarkMode ? '#1c1c1c' : '#e9ecef',
+  });
+
+  const getQueueCardStyle = () => ({
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    border: isDarkMode ? '1px solid #222' : '1px solid #e9ecef',
+    padding: '18px',
+    borderRadius: '18px',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: isDarkMode ? '0 4px 6px -1px rgba(0,0,0,0.2)' : '0 4px 6px -1px rgba(0,0,0,0.1)',
+  });
+
+  const getCardHeaderTitle = () => ({
+    fontSize: '0.92rem',
+    fontWeight: '700',
+    margin: 0,
+    color: isDarkMode ? '#ffffff' : '#212529',
+  });
+
+  const getLocationSubStyle = () => ({
+    fontSize: '0.78rem',
+    color: isDarkMode ? '#666666' : '#6c757d',
+    fontWeight: '500',
+    display: 'block',
+    marginTop: '2px',
+  });
+
+  const getCardPriceStyle = () => ({
+    fontSize: '0.92rem',
+    fontWeight: '700',
+    color: '#10b981',
+  });
+
+  const getMatchBadgeStyle = () => ({
+    display: 'inline-block',
+    padding: '4px 10px',
+    borderRadius: '24px',
+    fontSize: '0.78rem',
+    fontWeight: '800',
+    color: brandTeal,
+    backgroundColor: brandDarkTealbg,
+  });
+
+  const getAvatarCircleStyle = () => ({
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    backgroundColor: isDarkMode ? '#1c1c1c' : '#e9ecef',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: '800',
+    fontSize: '0.9rem',
+    border: isDarkMode ? '1px solid #262626' : '1px solid #dee2e6',
+    flexShrink: 0,
+  });
+
+  const getConnectButton = () => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    textDecoration: 'none',
+    padding: '11px',
+    borderRadius: '24px',
+    fontWeight: '700',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+  });
+
+  const getEmptyQueueCard = () => ({
+    backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+    border: isDarkMode ? '2px dashed #262626' : '2px dashed #dee2e6',
+    color: isDarkMode ? '#555' : '#6c757d',
+    padding: '36px 24px',
+    borderRadius: '16px',
+    textAlign: 'center',
+    fontSize: '0.9rem',
+  });
+
+  const getActiveBadge = () => ({
+    backgroundColor: '#132f1d',
+    color: '#10b981',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    fontSize: '0.7rem',
+    fontWeight: '700',
+  });
+
+  const getDarkBadge = () => ({
+    backgroundColor: isDarkMode ? '#1c1c1c' : '#e9ecef',
+    color: isDarkMode ? '#444' : '#adb5bd',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    fontSize: '0.7rem',
+    fontWeight: '600',
+    textDecoration: 'line-through',
+  });
+
+  const getMetaDividerStyle = () => ({
+    height: '1px',
+    backgroundColor: isDarkMode ? '#1f1f1f' : '#dee2e6',
+    margin: '14px 0 12px 0',
+  });
+
+  const getNavDockStyle = () => ({
+    position: 'fixed',
+    bottom: '24px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 'calc(100% - 32px)',
+    maxWidth: '380px',
+    borderRadius: '30px',
+    padding: '8px 12px',
+    display: 'flex',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    zIndex: 9999,
+    boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    backgroundColor: isDarkMode ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.85)',
+    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+  });
+
+  const getNavTabStyle = (isActive: boolean) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    textDecoration: 'none',
+    color: isActive ? brandTeal : isDarkMode ? '#666' : '#6c757d',
+    cursor: 'pointer',
+    transition: 'color 0.2s ease',
+    padding: isActive ? '6px 16px' : '6px 12px',
+    borderRadius: '20px',
+    backgroundColor: isActive 
+      ? (isDarkMode ? 'rgba(33, 125, 157, 0.15)' : 'rgba(33, 125, 157, 0.1)')
+      : 'transparent',
+  });
+
+  const getNavIconStyle = () => ({
+    fontSize: '1.4rem',
+  });
+
+  const getNavLabelStyle = () => ({
+    fontSize: '0.7rem',
+    fontWeight: '600',
+  });
+
   return (
-    <div style={appBgStyle}>
-      <div style={appContainerStyle}>
+    <div 
+      style={getAppBgStyle()}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div style={getAppContainerStyle()}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <h1 style={titleStyle}>Live Matches</h1>
-          <span style={{ ...autoMatchBtnStyle, color: brandTeal, backgroundColor: brandDarkTealbg }}>
-            Engine Active
-          </span>
+          <h1 style={getTitleStyle()}>Live Matches</h1>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={getAutoMatchBtnStyle()}>
+              Engine Active
+            </span>
+            <button
+              onClick={toggleTheme}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+          </div>
         </div>
-        <p style={{ color: '#666666', fontSize: '0.85rem', marginBottom: '24px', lineHeight: '1.4' }}>
+        <p style={{ color: isDarkMode ? '#666666' : '#6c757d', fontSize: '0.85rem', marginBottom: '24px', lineHeight: '1.4' }}>
           Straightforward matchmaking pairings tracking local parameters and utility access metrics.
         </p>
 
-        <div style={filterBoxStyle}>
-          <label style={filterLabelStyle}>Target City Filter</label>
-          <select value={city} onChange={handleCityChange} style={selectInputStyle}>
+        <div style={getFilterBoxStyle()}>
+          <label style={getFilterLabelStyle()}>Target City Filter</label>
+          <select value={city} onChange={handleCityChange} style={getSelectInputStyle()}>
             <option value="">Select location...</option>
             {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
-        {status === 'loading' && <p style={{ color: '#888', textAlign: 'center', fontSize: '0.9rem', margin: '30px 0' }}>Scanning pairing matrices...</p>}
+        {status === 'loading' && <p style={{ color: isDarkMode ? '#888' : '#6c757d', textAlign: 'center', fontSize: '0.9rem', margin: '30px 0' }}>Scanning pairing matrices...</p>}
 
         {status === 'loaded' && (
           <>
-            <div style={tabSwitcherGrid}>
+            <div style={getTabSwitcherGrid()}>
               <button
                 onClick={() => setRoleMode('landlord')}
-                style={roleMode === 'landlord' ? activeToggleBtnStyle : inactiveToggleBtnStyle}
+                style={roleMode === 'landlord' ? getActiveToggleBtnStyle() : getInactiveToggleBtnStyle()}
               >
                 🏠 Available Rooms ({listings.length})
               </button>
               <button
                 onClick={() => setRoleMode('tenant')}
-                style={roleMode === 'tenant' ? activeToggleBtnStyle : inactiveToggleBtnStyle}
+                style={roleMode === 'tenant' ? getActiveToggleBtnStyle() : getInactiveToggleBtnStyle()}
               >
                 🔍 Tenant Inquiries ({requests.length})
               </button>
@@ -120,40 +426,40 @@ export default function Matches() {
               {roleMode === 'landlord' && (
                 <>
                   {listings.length === 0 && (
-                    <div style={emptyQueueCard}>
+                    <div style={getEmptyQueueCard()}>
                       <p style={{ margin: '0 0 12px 0' }}>No active property rows listed in {city}.</p>
                       <Link href="/list-property" style={{ color: brandTeal, fontWeight: 'bold', textDecoration: 'none', fontSize: '0.85rem' }}>Be the first to list a room! →</Link>
                     </div>
                   )}
                   {listings.map((item: Listing) => (
-                    <div key={item.id} style={queueCardStyle}>
+                    <div key={item.id} style={getQueueCardStyle()}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                          <div style={avatarCircleStyle}>H</div>
+                          <div style={getAvatarCircleStyle()}>H</div>
                           <div>
-                            <h4 style={cardHeaderTitle}>{item.room_type} — {item.suburb}</h4>
-                            <span style={locationSubStyle}>📍 {city}, Zimbabwe</span>
+                            <h4 style={getCardHeaderTitle()}>{item.room_type} — {item.suburb}</h4>
+                            <span style={getLocationSubStyle()}>📍 {city}, Zimbabwe</span>
                             <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                              <span style={item.has_borehole ? activeBadge : darkBadge}>🚰 Borehole</span>
-                              <span style={item.has_electricity ? activeBadge : darkBadge}>💡 Power</span>
+                              <span style={item.has_borehole ? getActiveBadge() : getDarkBadge()}>🚰 Borehole</span>
+                              <span style={item.has_electricity ? getActiveBadge() : getDarkBadge()}>💡 Power</span>
                             </div>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                          <span style={{ ...matchBadgeStyle, color: brandTeal, backgroundColor: brandDarkTealbg }}>
+                          <span style={getMatchBadgeStyle()}>
                             {calculateMatchScore(item, true)}% Match
                           </span>
-                          <span style={cardPriceStyle}>${item.price}<span style={{ fontSize: '0.75rem', color: '#666' }}> /mo</span></span>
+                          <span style={getCardPriceStyle()}>${item.price}<span style={{ fontSize: '0.75rem', color: isDarkMode ? '#666' : '#6c757d' }}> /mo</span></span>
                         </div>
                       </div>
 
-                      <div style={metaDividerStyle}></div>
+                      <div style={getMetaDividerStyle()}></div>
 
                       <a
                         href={whatsappLink(item.whatsapp_number, `Hi! I saw your room listing in ${item.suburb} on mastanda-plug.`)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ ...connectButton, backgroundColor: brandTeal }}
+                        style={{ ...getConnectButton(), backgroundColor: brandTeal }}
                       >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                         Chat with Landlord
@@ -166,37 +472,37 @@ export default function Matches() {
               {roleMode === 'tenant' && (
                 <>
                   {requests.length === 0 && (
-                    <div style={emptyQueueCard}>
+                    <div style={getEmptyQueueCard()}>
                       <p style={{ margin: '0 0 12px 0' }}>No tenant profiles pending matching for {city}.</p>
                       <Link href="/find-room" style={{ color: brandTeal, fontWeight: 'bold', textDecoration: 'none', fontSize: '0.85rem' }}>Submit what you are searching for! →</Link>
                     </div>
                   )}
                   {requests.map((item: TenantRequest) => (
-                    <div key={item.id} style={queueCardStyle}>
+                    <div key={item.id} style={getQueueCardStyle()}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                          <div style={{ ...avatarCircleStyle, borderColor: '#33334d' }}>T</div>
+                          <div style={{ ...getAvatarCircleStyle(), borderColor: isDarkMode ? '#33334d' : '#dee2e6' }}>T</div>
                           <div>
-                            <h4 style={cardHeaderTitle}>{item.name || "Space Seeker"}</h4>
+                            <h4 style={getCardHeaderTitle()}>{item.name || "Space Seeker"}</h4>
                             <p style={{ fontSize: '0.82rem', color: brandTeal, fontWeight: '700', margin: '2px 0 4px 0' }}>{item.room_type_wanted}</p>
-                            <span style={locationSubStyle}>📍 Wants: {item.preferred_suburb || city}</span>
+                            <span style={getLocationSubStyle()}>📍 Wants: {item.preferred_suburb || city}</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                          <span style={{ ...matchBadgeStyle, color: brandTeal, backgroundColor: brandDarkTealbg }}>
+                          <span style={getMatchBadgeStyle()}>
                             {calculateMatchScore(item, false)}% Match
                           </span>
-                          <span style={{ ...cardPriceStyle, color: '#ffffff' }}>Max: ${item.max_price}</span>
+                          <span style={{ ...getCardPriceStyle(), color: isDarkMode ? '#ffffff' : '#212529' }}>Max: ${item.max_price}</span>
                         </div>
                       </div>
 
-                      <div style={metaDividerStyle}></div>
+                      <div style={getMetaDividerStyle()}></div>
 
                       <a
                         href={whatsappLink(item.whatsapp_number, `Hi! I saw your room search query for ${item.preferred_suburb || city} on mastanda-plug.`)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ ...connectButton, backgroundColor: '#181b3d', color: '#6366f1', border: '1px solid #22295c' }}
+                        style={{ ...getConnectButton(), backgroundColor: '#181b3d', color: '#6366f1', border: '1px solid #22295c' }}
                       >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                         Connect with Tenant
@@ -209,197 +515,22 @@ export default function Matches() {
           </>
         )}
       </div>
+
+      {/* Floating Navigation Dock */}
+      <div style={getNavDockStyle()}>
+        <Link href="/matches" style={getNavTabStyle(true)}>
+          <span style={getNavIconStyle()}>⚡</span>
+          <span style={getNavLabelStyle()}>Matches</span>
+        </Link>
+        <Link href="/properties" style={getNavTabStyle(false)}>
+          <span style={getNavIconStyle()}>🏠</span>
+          <span style={getNavLabelStyle()}>Properties</span>
+        </Link>
+        <Link href="/find-room" style={getNavTabStyle(false)}>
+          <span style={getNavIconStyle()}>👥</span>
+          <span style={getNavLabelStyle()}>Tenants</span>
+        </Link>
+      </div>
     </div>
   );
 }
-
-const appBgStyle: React.CSSProperties = {
-  backgroundColor: '#0d0d0d',
-  minHeight: '100vh',
-  color: '#ffffff',
-  padding: '30px 0 140px 0',
-  fontFamily: 'sans-serif',
-};
-
-const appContainerStyle: React.CSSProperties = {
-  maxWidth: '460px',
-  margin: '0 auto',
-  padding: '0 14px',
-};
-
-const titleStyle: React.CSSProperties = {
-  fontSize: '1.6rem',
-  fontWeight: '800',
-  margin: 0,
-  letterSpacing: '-0.3px',
-};
-
-const autoMatchBtnStyle: React.CSSProperties = {
-  borderRadius: '20px',
-  padding: '6px 14px',
-  fontSize: '0.75rem',
-  fontWeight: '700',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-};
-
-const filterBoxStyle: React.CSSProperties = {
-  backgroundColor: '#141414',
-  border: '1px solid #222',
-  padding: '14px',
-  borderRadius: '16px',
-  margin: '20px 0',
-};
-
-const filterLabelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.75rem',
-  fontWeight: '700',
-  textTransform: 'uppercase',
-  color: '#666',
-  marginBottom: '6px',
-  letterSpacing: '0.3px',
-};
-
-const selectInputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '12px',
-  borderRadius: '10px',
-  backgroundColor: '#0d0d0d',
-  border: '1px solid #2a2a2a',
-  color: '#fff',
-  outline: 'none',
-  fontSize: '0.95rem',
-};
-
-const tabSwitcherGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: '6px',
-  backgroundColor: '#141414',
-  padding: '4px',
-  borderRadius: '12px',
-  border: '1px solid #222222',
-  marginBottom: '20px',
-};
-
-const inactiveToggleBtnStyle: React.CSSProperties = {
-  padding: '10px 6px',
-  backgroundColor: 'transparent',
-  border: 'none',
-  color: '#666666',
-  borderRadius: '8px',
-  fontSize: '0.82rem',
-  fontWeight: '700',
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-};
-
-const activeToggleBtnStyle: React.CSSProperties = {
-  ...inactiveToggleBtnStyle,
-  color: '#ffffff',
-  backgroundColor: '#1c1c1c',
-};
-
-const queueCardStyle: React.CSSProperties = {
-  backgroundColor: '#141414',
-  border: '1px solid #222',
-  padding: '18px',
-  borderRadius: '18px',
-  display: 'flex',
-  flexDirection: 'column',
-  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2)',
-};
-
-const cardHeaderTitle: React.CSSProperties = {
-  fontSize: '1.05rem',
-  fontWeight: '800',
-  margin: 0,
-  color: '#ffffff',
-};
-
-const locationSubStyle: React.CSSProperties = {
-  fontSize: '0.78rem',
-  color: '#666666',
-  fontWeight: '500',
-  display: 'block',
-  marginTop: '2px',
-};
-
-const cardPriceStyle: React.CSSProperties = {
-  fontSize: '1.2rem',
-  fontWeight: '800',
-  color: '#10b981',
-};
-
-const matchBadgeStyle: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '4px 10px',
-  borderRadius: '24px',
-  fontSize: '0.78rem',
-  fontWeight: '800',
-};
-
-const avatarCircleStyle: React.CSSProperties = {
-  width: '36px',
-  height: '36px',
-  borderRadius: '50%',
-  backgroundColor: '#1c1c1c',
-  color: '#ffffff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: '800',
-  fontSize: '0.9rem',
-  border: '1px solid #262626',
-  flexShrink: 0,
-};
-
-const connectButton: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#fff',
-  textDecoration: 'none',
-  padding: '11px',
-  borderRadius: '24px',
-  fontWeight: '700',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-};
-
-const emptyQueueCard: React.CSSProperties = {
-  backgroundColor: '#141414',
-  border: '2px dashed #262626',
-  color: '#555',
-  padding: '36px 24px',
-  borderRadius: '16px',
-  textAlign: 'center',
-  fontSize: '0.9rem',
-};
-
-const activeBadge: React.CSSProperties = {
-  backgroundColor: '#132f1d',
-  color: '#10b981',
-  padding: '3px 8px',
-  borderRadius: '6px',
-  fontSize: '0.7rem',
-  fontWeight: '700',
-};
-
-const darkBadge: React.CSSProperties = {
-  backgroundColor: '#1c1c1c',
-  color: '#444',
-  padding: '3px 8px',
-  borderRadius: '6px',
-  fontSize: '0.7rem',
-  fontWeight: '600',
-  textDecoration: 'line-through',
-};
-
-const metaDividerStyle: React.CSSProperties = {
-  height: '1px',
-  backgroundColor: '#1f1f1f',
-  margin: '14px 0 12px 0',
-};

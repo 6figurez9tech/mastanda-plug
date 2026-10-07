@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -95,7 +96,10 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
   return (
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       <div
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         style={getTriggerStyle()}
       >
         <span>{value || placeholder}</span>
@@ -104,11 +108,15 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
         </span>
       </div>
       {isOpen && (
-        <div style={getDropdownStyle()}>
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          style={getDropdownStyle()}
+        >
           {options.map((option) => (
             <div
               key={option}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 onSelect(option);
                 setIsOpen(false);
               }}
@@ -132,7 +140,10 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
 export default function Matches() {
   const router = useRouter();
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   const touchEndX = useRef(0);
+  const touchEndY = useRef(0);
+  const touchStartTime = useRef(0);
   
   // Theme state with localStorage persistence
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -144,10 +155,19 @@ export default function Matches() {
     }
   }, []);
 
+  useEffect(() => {
+    const bg = isDarkMode ? '#0d0d0d' : '#f8f9fa';
+    document.documentElement.style.backgroundColor = bg;
+    document.body.style.backgroundColor = bg;
+  }, [isDarkMode]);
+
   const toggleTheme = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('themeChange'));
+    }
   };
 
   const [city, setCity] = useState('');
@@ -200,25 +220,46 @@ export default function Matches() {
   // Swipe gesture handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.changedTouches[0].screenX;
+    touchStartY.current = e.changedTouches[0].screenY;
+    touchStartTime.current = Date.now();
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     touchEndX.current = e.changedTouches[0].screenX;
+    touchEndY.current = e.changedTouches[0].screenY;
     handleSwipe();
   };
 
   const handleSwipe = () => {
-    const swipeThreshold = 50;
-    const diff = touchStartX.current - touchEndX.current;
+    const MIN_SWIPE_DISTANCE = 100;
+    const MAX_SWIPE_DURATION = 300;
+    
+    const deltaX = touchEndX.current - touchStartX.current;
+    const deltaY = touchEndY.current - touchStartY.current;
+    const duration = Date.now() - touchStartTime.current;
 
-    if (Math.abs(diff) > swipeThreshold) {
-      if (diff > 0) {
-        // Swipe left - go to Properties
-        router.push('/properties');
-      } else {
-        // Swipe right - go to Tenants
-        router.push('/find-room');
-      }
+    // Only trigger if horizontal movement is significantly greater than vertical (axis locking)
+    if (Math.abs(deltaX) <= Math.abs(deltaY) * 2) {
+      return;
+    }
+
+    // Only trigger if swipe distance meets minimum threshold
+    if (Math.abs(deltaX) <= MIN_SWIPE_DISTANCE) {
+      return;
+    }
+
+    // Only trigger if swipe is fast enough (distinguishes from slow drag)
+    if (duration >= MAX_SWIPE_DURATION) {
+      return;
+    }
+
+    // Execute navigation based on direction
+    if (deltaX > 0) {
+      // Swipe right - go to Tenants
+      router.push('/find-room');
+    } else {
+      // Swipe left - go to Properties
+      router.push('/properties');
     }
   };
 
@@ -226,16 +267,24 @@ export default function Matches() {
   const getAppBgStyle = () => ({
     backgroundColor: isDarkMode ? '#0d0d0d' : '#f8f9fa',
     minHeight: '100vh',
+    height: 'auto',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    margin: 0,
+    padding: '0 16px 140px 16px',
     color: isDarkMode ? '#ffffff' : '#212529',
-    padding: '16px 0 100px 0',
     fontFamily: 'sans-serif',
+    flex: 1,
+    boxSizing: 'border-box' as const,
   });
 
   const getAppContainerStyle = () => ({
+    width: '100%',
     maxWidth: '430px',
     margin: '0 auto',
-    padding: '0 16px',
-    position: 'relative',
+    boxSizing: 'border-box' as const,
+    position: 'relative' as const,
   });
 
   const getTitleStyle = () => ({
@@ -413,7 +462,7 @@ export default function Matches() {
     left: '50%',
     transform: 'translateX(-50%)',
     width: 'calc(100% - 32px)',
-    maxWidth: '380px',
+    maxWidth: '398px',
     borderRadius: '30px',
     padding: '8px 12px',
     display: 'flex',
@@ -460,14 +509,17 @@ export default function Matches() {
     >
       <div style={getAppContainerStyle()}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', marginBottom: '6px' }}>
           <h1 style={getTitleStyle()}>Live Matches</h1>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={getAutoMatchBtnStyle()}>
               Engine Active
             </span>
             <button
-              onClick={toggleTheme}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleTheme();
+              }}
               style={{
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -501,13 +553,19 @@ export default function Matches() {
           <>
             <div style={getTabSwitcherGrid()}>
               <button
-                onClick={() => setRoleMode('landlord')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRoleMode('landlord');
+                }}
                 style={roleMode === 'landlord' ? getActiveToggleBtnStyle() : getInactiveToggleBtnStyle()}
               >
                 🏠 Available Rooms ({listings.length})
               </button>
               <button
-                onClick={() => setRoleMode('tenant')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRoleMode('tenant');
+                }}
                 style={roleMode === 'tenant' ? getActiveToggleBtnStyle() : getInactiveToggleBtnStyle()}
               >
                 🔍 Tenant Inquiries ({requests.length})

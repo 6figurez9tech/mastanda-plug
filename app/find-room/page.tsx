@@ -1,10 +1,7 @@
-// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../utils/supabaseClient";
-import Link from "next/link";
-import { useRouter } from 'next/navigation';
 
 interface TenantRequest {
   id: string | number;
@@ -41,7 +38,6 @@ const PROPERTY_TYPES = [
   "Standalone House",
   "Luxury Villa",
 ];
-const ROOM_TYPES = PROPERTY_TYPES;
 
 // Custom Dropdown Component
 interface CustomDropdownProps {
@@ -69,7 +65,7 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
     };
   }, []);
 
-  const getTriggerStyle = () => ({
+  const getTriggerStyle = (): React.CSSProperties => ({
     boxSizing: 'border-box',
     width: '100%',
     padding: '12px 16px',
@@ -154,21 +150,25 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
 }
 
 export default function TenantDashboard() {
-  const router = useRouter();
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const touchEndX = useRef(0);
-  const touchEndY = useRef(0);
-  const touchStartTime = useRef(0);
-  
   // Theme state with localStorage persistence
   const [isDarkMode, setIsDarkMode] = useState(true);
   
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme !== null) {
-      setIsDarkMode(savedTheme === 'dark');
-    }
+    const readTheme = () => {
+      const savedTheme = localStorage.getItem('theme');
+      setIsDarkMode(savedTheme === null ? true : savedTheme === 'dark');
+    };
+
+    // Initial sync with localStorage, deferred to just before the next
+    // paint so the effect body itself never calls setState synchronously.
+    const raf = requestAnimationFrame(readTheme);
+
+    // Keep this page's theme in sync when it is toggled on another page.
+    window.addEventListener('themeChange', readTheme);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('themeChange', readTheme);
+    };
   }, []);
 
   useEffect(() => {
@@ -209,8 +209,6 @@ export default function TenantDashboard() {
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const brandTeal = "#217d9d";
 
   const fetchTenants = async () => {
     const { data, error } = await supabase
@@ -329,54 +327,8 @@ export default function TenantDashboard() {
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
   };
 
-  // Swipe gesture handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.changedTouches[0].screenX;
-    touchStartY.current = e.changedTouches[0].screenY;
-    touchStartTime.current = Date.now();
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].screenX;
-    touchEndY.current = e.changedTouches[0].screenY;
-    handleSwipe();
-  };
-
-  const handleSwipe = () => {
-    const MIN_SWIPE_DISTANCE = 100;
-    const MAX_SWIPE_DURATION = 300;
-    
-    const deltaX = touchEndX.current - touchStartX.current;
-    const deltaY = touchEndY.current - touchStartY.current;
-    const duration = Date.now() - touchStartTime.current;
-
-    // Only trigger if horizontal movement is significantly greater than vertical (axis locking)
-    if (Math.abs(deltaX) <= Math.abs(deltaY) * 2) {
-      return;
-    }
-
-    // Only trigger if swipe distance meets minimum threshold
-    if (Math.abs(deltaX) <= MIN_SWIPE_DISTANCE) {
-      return;
-    }
-
-    // Only trigger if swipe is fast enough (distinguishes from slow drag)
-    if (duration >= MAX_SWIPE_DURATION) {
-      return;
-    }
-
-    // Execute navigation based on direction
-    if (deltaX > 0) {
-      // Swipe right - go to Properties
-      router.push('/properties');
-    } else {
-      // Swipe left - go to Matches
-      router.push('/matches');
-    }
-  };
-
   // Theme-aware style helpers
-  const getPanelBgStyle = () => ({
+  const getPanelBgStyle = (): React.CSSProperties => ({
     fontFamily: "sans-serif",
     backgroundColor: isDarkMode ? "#0d0d0d" : "#f8f9fa",
     minHeight: "100vh",
@@ -385,7 +337,7 @@ export default function TenantDashboard() {
     display: "flex",
     flexDirection: "column",
     margin: 0,
-    padding: "0 16px 140px 16px",
+    padding: "0 16px var(--bottom-nav-clearance) 16px",
     color: isDarkMode ? "#ffffff" : "#212529",
     flex: 1,
     boxSizing: "border-box" as const,
@@ -413,7 +365,7 @@ export default function TenantDashboard() {
     fontWeight: "800",
   });
 
-  const getSearchBarFieldStyle = () => ({
+  const getSearchBarFieldStyle = (): React.CSSProperties => ({
     boxSizing: "border-box",
     width: "100%",
     padding: "12px 16px",
@@ -425,7 +377,7 @@ export default function TenantDashboard() {
     outline: "none",
   });
 
-  const getFilterSuiteContainerStyle = () => ({
+  const getFilterSuiteContainerStyle = (): React.CSSProperties => ({
     display: "flex",
     flexDirection: "column",
     gap: "12px",
@@ -433,7 +385,7 @@ export default function TenantDashboard() {
     width: "100%",
   });
 
-  const getTableViewportOuterWrapper = () => ({
+  const getTableViewportOuterWrapper = (): React.CSSProperties => ({
     backgroundColor: isDarkMode ? "#141414" : "#ffffff",
     border: isDarkMode ? "1px solid #1f1f1f" : "1px solid #e9ecef",
     borderRadius: "16px",
@@ -443,13 +395,13 @@ export default function TenantDashboard() {
     boxSizing: "border-box",
   });
 
-  const getScrollContainerIndicator = () => ({
+  const getScrollContainerIndicator = (): React.CSSProperties => ({
     overflowX: "auto",
     WebkitOverflowScrolling: "touch",
     width: "100%",
   });
 
-  const getMainDataTableLayout = () => ({
+  const getMainDataTableLayout = (): React.CSSProperties => ({
     width: "100%",
     minWidth: "600px",
     borderCollapse: "collapse",
@@ -520,7 +472,7 @@ export default function TenantDashboard() {
     whiteSpace: "nowrap",
   });
 
-  const getFormWrapperCardStyle = () => ({
+  const getFormWrapperCardStyle = (): React.CSSProperties => ({
     backgroundColor: isDarkMode ? "#141414" : "#ffffff",
     border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
     borderRadius: "20px",
@@ -545,13 +497,13 @@ export default function TenantDashboard() {
     lineHeight: "1.4",
   });
 
-  const getFormGridStructure = () => ({
+  const getFormGridStructure = (): React.CSSProperties => ({
     display: "flex",
     flexDirection: "column",
     gap: "16px",
   });
 
-  const getFieldBlockStyle = () => ({
+  const getFieldBlockStyle = (): React.CSSProperties => ({
     display: "flex",
     flexDirection: "column",
     gap: "6px",
@@ -563,7 +515,7 @@ export default function TenantDashboard() {
     color: isDarkMode ? "#ffffff" : "#212529",
   });
 
-  const getInputBoxStyle = () => ({
+  const getInputBoxStyle = (): React.CSSProperties => ({
     boxSizing: "border-box",
     width: "100%",
     padding: "12px",
@@ -605,7 +557,7 @@ export default function TenantDashboard() {
     cursor: "pointer",
   });
 
-  const getBaseButtonStyle = () => ({
+  const getBaseButtonStyle = (): React.CSSProperties => ({
     display: "block",
     width: "100%",
     padding: "14px",
@@ -617,13 +569,13 @@ export default function TenantDashboard() {
     textAlign: "center",
   });
 
-  const getSubmitPillBtnStyle = () => ({
+  const getSubmitPillBtnStyle = (): React.CSSProperties => ({
     ...getBaseButtonStyle(),
     backgroundColor: "#217d9d",
     color: "#ffffff",
   });
 
-  const getMessageTenantPillBtn = () => ({
+  const getMessageTenantPillBtn = (): React.CSSProperties => ({
     ...getBaseButtonStyle(),
     display: "inline-block",
     width: "auto",
@@ -634,7 +586,7 @@ export default function TenantDashboard() {
     fontSize: "0.85rem",
   });
 
-  const getCloseDetailPanelBtn = () => ({
+  const getCloseDetailPanelBtn = (): React.CSSProperties => ({
     ...getBaseButtonStyle(),
     padding: "12px",
     backgroundColor: isDarkMode ? "#222" : "#e9ecef",
@@ -644,7 +596,7 @@ export default function TenantDashboard() {
     fontSize: "0.9rem",
   });
 
-  const getDetailInnerCardBoxStyle = () => ({
+  const getDetailInnerCardBoxStyle = (): React.CSSProperties => ({
     display: "flex",
     flexDirection: "column",
     gap: "20px",
@@ -655,7 +607,7 @@ export default function TenantDashboard() {
     marginBottom: "24px",
   });
 
-  const getMetaFieldGroup = () => ({
+  const getMetaFieldGroup = (): React.CSSProperties => ({
     display: "flex",
     flexDirection: "column",
     gap: "4px",
@@ -673,57 +625,8 @@ export default function TenantDashboard() {
     color: isDarkMode ? "#ffffff" : "#212529",
   });
 
-  const getNavDockStyle = () => ({
-    position: "fixed",
-    bottom: "24px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "calc(100% - 32px)",
-    maxWidth: "398px",
-    borderRadius: "30px",
-    padding: "8px 12px",
-    display: "flex",
-    justifyContent: "space-around",
-    alignItems: "center",
-    zIndex: 9999,
-    boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    backgroundColor: isDarkMode ? "rgba(26, 26, 26, 0.8)" : "rgba(255, 255, 255, 0.85)",
-    border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.05)",
-  });
-
-  const getNavTabStyle = (isActive: boolean) => ({
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "4px",
-    textDecoration: "none",
-    color: isActive ? brandTeal : isDarkMode ? "#666" : "#6c757d",
-    cursor: "pointer",
-    transition: "color 0.2s ease",
-    padding: isActive ? "6px 16px" : "6px 12px",
-    borderRadius: "20px",
-    backgroundColor: isActive 
-      ? (isDarkMode ? "rgba(33, 125, 157, 0.15)" : "rgba(33, 125, 157, 0.1)")
-      : "transparent",
-  });
-
-  const getNavIconStyle = () => ({
-    fontSize: "1.4rem",
-  });
-
-  const getNavLabelStyle = () => ({
-    fontSize: "0.7rem",
-    fontWeight: "600",
-  });
-
   return (
-    <div 
-      style={getPanelBgStyle()}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div style={getPanelBgStyle()}>
       <style>{`
         .filter-suite-responsive {
           display: flex;
@@ -1140,22 +1043,6 @@ export default function TenantDashboard() {
             )}
           </>
         )}
-      </div>
-
-      {/* Floating Navigation Dock */}
-      <div style={getNavDockStyle()}>
-        <Link href="/matches" style={getNavTabStyle(false)}>
-          <span style={getNavIconStyle()}>⚡</span>
-          <span style={getNavLabelStyle()}>Matches</span>
-        </Link>
-        <Link href="/properties" style={getNavTabStyle(false)}>
-          <span style={getNavIconStyle()}>🏠</span>
-          <span style={getNavLabelStyle()}>Properties</span>
-        </Link>
-        <Link href="/find-room" style={getNavTabStyle(true)}>
-          <span style={getNavIconStyle()}>👥</span>
-          <span style={getNavLabelStyle()}>Tenants</span>
-        </Link>
       </div>
     </div>
   );

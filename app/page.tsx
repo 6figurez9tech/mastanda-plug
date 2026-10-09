@@ -1,26 +1,28 @@
-// @ts-nocheck
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  const router = useRouter();
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const touchEndX = useRef(0);
-  const touchEndY = useRef(0);
-  const touchStartTime = useRef(0);
-  
   // Theme state with localStorage persistence
   const [isDarkMode, setIsDarkMode] = useState(true);
   
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme !== null) {
-      setIsDarkMode(savedTheme === 'dark');
-    }
+    const readTheme = () => {
+      const savedTheme = localStorage.getItem('theme');
+      setIsDarkMode(savedTheme === null ? true : savedTheme === 'dark');
+    };
+
+    // Initial sync with localStorage, deferred to just before the next
+    // paint so the effect body itself never calls setState synchronously.
+    const raf = requestAnimationFrame(readTheme);
+
+    // Keep this page's theme in sync when it is toggled on another page.
+    window.addEventListener('themeChange', readTheme);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('themeChange', readTheme);
+    };
   }, []);
 
   useEffect(() => {
@@ -40,53 +42,8 @@ export default function Home() {
 
   const brandTeal = '#217d9d';
 
-  // Swipe gesture handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.changedTouches[0].screenX;
-    touchStartY.current = e.changedTouches[0].screenY;
-    touchStartTime.current = Date.now();
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].screenX;
-    touchEndY.current = e.changedTouches[0].screenY;
-    handleSwipe();
-  };
-
-  const handleSwipe = () => {
-    const MIN_SWIPE_DISTANCE = 100;
-    const MAX_SWIPE_DURATION = 300;
-    
-    const deltaX = touchEndX.current - touchStartX.current;
-    const deltaY = touchEndY.current - touchStartY.current;
-    const duration = Date.now() - touchStartTime.current;
-
-    // Only trigger if horizontal movement is significantly greater than vertical (axis locking)
-    if (Math.abs(deltaX) <= Math.abs(deltaY) * 2) {
-      return;
-    }
-
-    // Only trigger if swipe distance meets minimum threshold
-    if (Math.abs(deltaX) <= MIN_SWIPE_DISTANCE) {
-      return;
-    }
-
-    // Only trigger if swipe is fast enough (distinguishes from slow drag)
-    if (duration >= MAX_SWIPE_DURATION) {
-      return;
-    }
-
-    // Execute navigation based on direction
-    if (deltaX > 0) {
-      // Swipe right - no action on homepage
-    } else {
-      // Swipe left - go to Matches
-      router.push('/matches');
-    }
-  };
-
   // Theme-aware style helpers
-  const getAppBgStyle = () => ({
+  const getAppBgStyle = (): React.CSSProperties => ({
     backgroundColor: isDarkMode ? '#0d0d0d' : '#f8f9fa',
     minHeight: '100vh',
     height: 'auto',
@@ -94,7 +51,7 @@ export default function Home() {
     display: 'flex',
     flexDirection: 'column',
     margin: 0,
-    padding: '0 16px 140px 16px',
+    padding: '0 16px var(--bottom-nav-clearance) 16px',
     color: isDarkMode ? '#ffffff' : '#212529',
     fontFamily: 'sans-serif',
     flex: 1,
@@ -123,7 +80,7 @@ export default function Home() {
     fontWeight: '800',
   });
 
-  const getBrandContainerStyle = () => ({
+  const getBrandContainerStyle = (): React.CSSProperties => ({
     textAlign: 'center',
     marginBottom: '36px',
   });
@@ -143,7 +100,7 @@ export default function Home() {
     margin: 0,
   });
 
-  const getMetricGridStyle = () => ({
+  const getMetricGridStyle = (): React.CSSProperties => ({
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -176,7 +133,7 @@ export default function Home() {
     margin: 0,
   });
 
-  const getPrimaryActionBtn = () => ({
+  const getPrimaryActionBtn = (): React.CSSProperties => ({
     display: 'block',
     textAlign: 'center',
     padding: '14px',
@@ -202,57 +159,8 @@ export default function Home() {
     border: '2px solid ' + brandTeal,
   });
 
-  const getNavDockStyle = () => ({
-    position: 'fixed',
-    bottom: '24px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: 'calc(100% - 32px)',
-    maxWidth: '398px',
-    borderRadius: '30px',
-    padding: '8px 12px',
-    display: 'flex',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    zIndex: 9999,
-    boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    backgroundColor: isDarkMode ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.85)',
-    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
-  });
-
-  const getNavTabStyle = (isActive: boolean) => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    textDecoration: 'none',
-    color: isActive ? brandTeal : isDarkMode ? '#666' : '#6c757d',
-    cursor: 'pointer',
-    transition: 'color 0.2s ease',
-    padding: isActive ? '6px 16px' : '6px 12px',
-    borderRadius: '20px',
-    backgroundColor: isActive 
-      ? (isDarkMode ? 'rgba(33, 125, 157, 0.15)' : 'rgba(33, 125, 157, 0.1)')
-      : 'transparent',
-  });
-
-  const getNavIconStyle = () => ({
-    fontSize: '1.4rem',
-  });
-
-  const getNavLabelStyle = () => ({
-    fontSize: '0.7rem',
-    fontWeight: '600',
-  });
-
   return (
-    <div 
-      style={getAppBgStyle()}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div style={getAppBgStyle()}>
       <div style={getAppContainerStyle()}>
         
         <div style={getHeaderRowStyle()}>
@@ -298,22 +206,6 @@ export default function Home() {
           <Link href="/matches" style={getMatchesActionBtn()}>⚡ Launch Active Match Core Engine</Link>
         </div>
 
-      </div>
-
-      {/* Floating Navigation Dock */}
-      <div style={getNavDockStyle()}>
-        <Link href="/matches" style={getNavTabStyle(false)}>
-          <span style={getNavIconStyle()}>⚡</span>
-          <span style={getNavLabelStyle()}>Matches</span>
-        </Link>
-        <Link href="/properties" style={getNavTabStyle(false)}>
-          <span style={getNavIconStyle()}>🏠</span>
-          <span style={getNavLabelStyle()}>Properties</span>
-        </Link>
-        <Link href="/find-room" style={getNavTabStyle(false)}>
-          <span style={getNavIconStyle()}>👥</span>
-          <span style={getNavLabelStyle()}>Tenants</span>
-        </Link>
       </div>
     </div>
   );

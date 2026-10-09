@@ -1,9 +1,10 @@
-// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect } from "react";
 import "./globals.css";
 import Navbar from "./components/Navbar";
+import { SwipeProvider } from "./components/SwipeNavigator";
+import { SwipeWrapper } from "./components/SwipeWrapper";
 
 export default function RootLayout({
   children,
@@ -13,21 +14,21 @@ export default function RootLayout({
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme !== null) {
-      setIsDarkMode(savedTheme === "dark");
-    }
-
-    const handleStorage = () => {
+    const readTheme = () => {
       const theme = localStorage.getItem("theme");
-      if (theme !== null) {
-        setIsDarkMode(theme === "dark");
-      }
+      setIsDarkMode(theme === null ? true : theme === "dark");
     };
+
+    const handleStorage = () => readTheme();
+
+    // Initial sync with localStorage, deferred to just before the next
+    // paint so the effect body itself never calls setState synchronously.
+    const raf = requestAnimationFrame(readTheme);
 
     window.addEventListener("storage", handleStorage);
     window.addEventListener("themeChange", handleStorage);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("themeChange", handleStorage);
     };
@@ -38,16 +39,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="h-full antialiased"
       suppressHydrationWarning
       style={{
-        backgroundColor: bgColor,
         margin: 0,
         padding: 0,
-        minHeight: "100vh",
         width: "100%",
+        minHeight: "100vh",
         height: "100%",
-        boxSizing: "border-box",
+        backgroundColor: bgColor,
       }}
     >
       <head>
@@ -55,20 +54,37 @@ export default function RootLayout({
         <meta name="description" content="A simpler way for Zimbabwean tenants and landlords to connect." />
       </head>
       <body
-        className="min-h-full flex flex-col"
         style={{
-          backgroundColor: bgColor,
           margin: 0,
           padding: 0,
-          minHeight: "100vh",
           width: "100%",
+          minHeight: "100vh",
+          height: "100%",
+          backgroundColor: bgColor,
           display: "flex",
           flexDirection: "column",
-          boxSizing: "border-box",
         }}
       >
-        <Navbar />
-        {children}
+        <SwipeProvider>
+          <Navbar isDarkMode={isDarkMode} />
+          {/* The swipe deck owns scrolling (each page panel scrolls itself),
+              so main is just a bounded flex box. Non-deck routes scroll via
+              the plain viewport inside SwipeWrapper. Page-level bottom padding
+              (--bottom-nav-clearance) keeps content clear of the floating
+              bottom navigation pill. */}
+          <main
+            style={{
+              flex: 1,
+              minHeight: 0,
+              width: "100%",
+              overflow: "hidden",
+            }}
+          >
+            <SwipeWrapper>
+              {children}
+            </SwipeWrapper>
+          </main>
+        </SwipeProvider>
       </body>
     </html>
   );

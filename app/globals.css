@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
-:root { --background: #f7f8f7; --foreground: #0f172a; }
+:root {
+  --background: #f7f8f7;
+  --foreground: #0f172a;
+  /* Floating bottom navigation geometry. --bottom-nav-float is how high
+     the pill sits above the viewport bottom; --bottom-nav-clearance is the
+     page-level bottom padding that keeps content clear of it (pill height +
+     float offset + breathing room). env(safe-area-inset-bottom) keeps both
+     clear of native home-gesture areas. */
+  --bottom-nav-float: calc(20px + env(safe-area-inset-bottom));
+  --bottom-nav-clearance: calc(110px + env(safe-area-inset-bottom));
+}
 
 * { box-sizing: border-box; }
 

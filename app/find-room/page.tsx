@@ -15,7 +15,16 @@ interface TenantRequest {
   needs_borehole?: boolean;
   needs_municipal_water?: boolean;
   needs_solar_backup?: boolean;
+  needs_security?: boolean;
+  needs_parking?: boolean;
+  needs_internet?: boolean;
   created_at?: string;
+  is_searching?: boolean;
+  is_verified?: boolean;
+  searching_confirmed_date?: string;
+  preferred_move_in_date?: string;
+  lease_length_wanted?: string;
+  number_of_occupants?: number;
 }
 
 interface TenantFormData {
@@ -26,6 +35,10 @@ interface TenantFormData {
   max_price: string;
   whatsapp_number: string;
   status: string;
+  searching_confirmed_date: string;
+  preferred_move_in_date: string;
+  lease_length_wanted: string;
+  number_of_occupants: string;
 }
 
 const CITIES = ["Harare", "Bulawayo", "Mutare", "Gweru"];
@@ -159,11 +172,7 @@ export default function TenantDashboard() {
       setIsDarkMode(savedTheme === null ? true : savedTheme === 'dark');
     };
 
-    // Initial sync with localStorage, deferred to just before the next
-    // paint so the effect body itself never calls setState synchronously.
     const raf = requestAnimationFrame(readTheme);
-
-    // Keep this page's theme in sync when it is toggled on another page.
     window.addEventListener('themeChange', readTheme);
     return () => {
       cancelAnimationFrame(raf);
@@ -192,6 +201,7 @@ export default function TenantDashboard() {
   const [filterStatus, setFilterStatus] = useState("All statuses");
   const [filterCity, setFilterCity] = useState("All cities");
   const [selectedTenant, setSelectedTenant] = useState<TenantRequest | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
 
   const [formData, setFormData] = useState<TenantFormData>({
     name: "",
@@ -201,11 +211,18 @@ export default function TenantDashboard() {
     max_price: "",
     whatsapp_number: "",
     status: "Searching",
+    searching_confirmed_date: "",
+    preferred_move_in_date: "",
+    lease_length_wanted: "",
+    number_of_occupants: "",
   });
 
   const [needs_borehole, setNeedsBorehole] = useState(false);
   const [needs_municipal_water, setNeedsMunicipalWater] = useState(false);
   const [needs_solar_backup, setNeedsSolarBackup] = useState(false);
+  const [needs_security, setNeedsSecurity] = useState(false);
+  const [needs_parking, setNeedsParking] = useState(false);
+  const [needs_internet, setNeedsInternet] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -213,9 +230,7 @@ export default function TenantDashboard() {
   const fetchTenants = async () => {
     const { data, error } = await supabase
       .from("tenant_requests")
-      .select(
-        "id, name, city, preferred_suburb, room_type_wanted, max_price, whatsapp_number, status, needs_borehole, needs_municipal_water, needs_solar_backup, created_at"
-      )
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -229,9 +244,7 @@ export default function TenantDashboard() {
     (async () => {
       const { data, error } = await supabase
         .from("tenant_requests")
-        .select(
-          "id, name, city, preferred_suburb, room_type_wanted, max_price, whatsapp_number, status, needs_borehole, needs_municipal_water, needs_solar_backup, created_at"
-        )
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (cancelled) return;
@@ -284,26 +297,70 @@ export default function TenantDashboard() {
     setSubmitError(null);
     const cleanPhone = String(formData.whatsapp_number || "").replace(/[^0-9]/g, "");
     const maxPrice = parseFloat(formData.max_price);
+    const numOccupants = parseInt(formData.number_of_occupants) || null;
 
-    const { error } = await supabase.from("tenant_requests").insert([
-      {
-        name: formData.name,
-        city: formData.city,
-        preferred_suburb: formData.preferred_suburb || null,
-        room_type_wanted: formData.room_type_wanted,
-        max_price: maxPrice,
-        whatsapp_number: cleanPhone,
-        status: formData.status,
-        needs_borehole,
-        needs_municipal_water,
-        needs_solar_backup,
-      },
-    ]);
+    if (editingId) {
+      // Update existing tenant request
+      const { error } = await supabase
+        .from("tenant_requests")
+        .update({
+          name: formData.name,
+          city: formData.city,
+          preferred_suburb: formData.preferred_suburb || null,
+          room_type_wanted: formData.room_type_wanted,
+          max_price: maxPrice,
+          whatsapp_number: cleanPhone,
+          status: formData.status,
+          needs_borehole,
+          needs_municipal_water,
+          needs_solar_backup,
+          needs_security,
+          needs_parking,
+          needs_internet,
+          searching_confirmed_date: formData.searching_confirmed_date || null,
+          preferred_move_in_date: formData.preferred_move_in_date || null,
+          lease_length_wanted: formData.lease_length_wanted || null,
+          number_of_occupants: numOccupants,
+        })
+        .eq('id', editingId);
 
-    if (error) {
-      setSubmitError(error.message);
-      return;
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+      setEditingId(null);
+    } else {
+      // Insert new tenant request
+      const { error } = await supabase.from("tenant_requests").insert([
+        {
+          name: formData.name,
+          city: formData.city,
+          preferred_suburb: formData.preferred_suburb || null,
+          room_type_wanted: formData.room_type_wanted,
+          max_price: maxPrice,
+          whatsapp_number: cleanPhone,
+          status: formData.status,
+          needs_borehole,
+          needs_municipal_water,
+          needs_solar_backup,
+          needs_security,
+          needs_parking,
+          needs_internet,
+          searching_confirmed_date: formData.searching_confirmed_date || null,
+          preferred_move_in_date: formData.preferred_move_in_date || null,
+          lease_length_wanted: formData.lease_length_wanted || null,
+          number_of_occupants: numOccupants,
+          is_searching: true,
+          is_verified: false,
+        },
+      ]);
+
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
     }
+
     setFormData({
       name: "",
       city: "Harare",
@@ -312,11 +369,55 @@ export default function TenantDashboard() {
       max_price: "",
       whatsapp_number: "",
       status: "Searching",
+      searching_confirmed_date: "",
+      preferred_move_in_date: "",
+      lease_length_wanted: "",
+      number_of_occupants: "",
     });
     setNeedsBorehole(false);
     setNeedsMunicipalWater(false);
     setNeedsSolarBackup(false);
+    setNeedsSecurity(false);
+    setNeedsParking(false);
+    setNeedsInternet(false);
+    setShowForm(false);
     fetchTenants();
+  };
+
+  const handleEditTenant = (tenant: TenantRequest) => {
+    setEditingId(tenant.id);
+    setFormData({
+      name: tenant.name,
+      city: tenant.city,
+      preferred_suburb: tenant.preferred_suburb || "",
+      room_type_wanted: tenant.room_type_wanted,
+      max_price: String(tenant.max_price),
+      whatsapp_number: tenant.whatsapp_number,
+      status: tenant.status,
+      searching_confirmed_date: tenant.searching_confirmed_date || "",
+      preferred_move_in_date: tenant.preferred_move_in_date || "",
+      lease_length_wanted: tenant.lease_length_wanted || "",
+      number_of_occupants: String(tenant.number_of_occupants || ""),
+    });
+    setNeedsBorehole(tenant.needs_borehole || false);
+    setNeedsMunicipalWater(tenant.needs_municipal_water || false);
+    setNeedsSolarBackup(tenant.needs_solar_backup || false);
+    setNeedsSecurity(tenant.needs_security || false);
+    setNeedsParking(tenant.needs_parking || false);
+    setNeedsInternet(tenant.needs_internet || false);
+    setShowForm(true);
+  };
+
+  const handleToggleSearching = async (tenant: TenantRequest) => {
+    const newStatus = !tenant.is_searching;
+    const { error } = await supabase
+      .from("tenant_requests")
+      .update({ is_searching: newStatus })
+      .eq('id', tenant.id);
+
+    if (!error) {
+      fetchTenants();
+    }
   };
 
   const whatsappLink = (number: string | number, message: string) => {
@@ -337,7 +438,7 @@ export default function TenantDashboard() {
     display: "flex",
     flexDirection: "column",
     margin: 0,
-    padding: "0 16px var(--bottom-nav-clearance) 16px",
+    padding: "0 16px 90px 16px",
     color: isDarkMode ? "#ffffff" : "#212529",
     flex: 1,
     boxSizing: "border-box" as const,
@@ -366,15 +467,15 @@ export default function TenantDashboard() {
   });
 
   const getSearchBarFieldStyle = (): React.CSSProperties => ({
-    boxSizing: "border-box",
-    width: "100%",
-    padding: "12px 16px",
-    backgroundColor: isDarkMode ? "#111111" : "#f1f3f5",
-    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
-    borderRadius: "24px",
-    color: isDarkMode ? "#ffffff" : "#212529",
-    fontSize: "0.95rem",
-    outline: "none",
+    boxSizing: 'border-box',
+    width: '100%',
+    padding: '12px 16px',
+    backgroundColor: isDarkMode ? '#111111' : '#f1f3f5',
+    border: isDarkMode ? '1px solid #222' : '1px solid #e9ecef',
+    borderRadius: '24px',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    outline: 'none',
   });
 
   const getFilterSuiteContainerStyle = (): React.CSSProperties => ({
@@ -403,7 +504,7 @@ export default function TenantDashboard() {
 
   const getMainDataTableLayout = (): React.CSSProperties => ({
     width: "100%",
-    minWidth: "600px",
+    minWidth: "800px",
     borderCollapse: "collapse",
     textAlign: "left",
   });
@@ -458,6 +559,20 @@ export default function TenantDashboard() {
     color: "#10b981",
   });
 
+  const getVerifiedBadgeStyle = () => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "4px 10px",
+    borderRadius: "12px",
+    fontSize: "0.72rem",
+    fontWeight: "700",
+    backgroundColor: "rgba(33, 125, 157, 0.1)",
+    color: "#217d9d",
+    border: "1px solid #217d9d",
+    marginLeft: "8px",
+  });
+
   const getUtilityBadgeStyle = () => ({
     display: "inline-flex",
     alignItems: "center",
@@ -470,6 +585,14 @@ export default function TenantDashboard() {
     color: "#38bdf8",
     border: "1px solid #1e3a4b",
     whiteSpace: "nowrap",
+  });
+
+  const getStatusPillStyle = (isSearching: boolean) => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: isSearching ? "#3a230f" : "#2a2a2a",
+    color: isSearching ? "#f59e0b" : "#888888",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
   });
 
   const getFormWrapperCardStyle = (): React.CSSProperties => ({
@@ -575,6 +698,21 @@ export default function TenantDashboard() {
     color: "#ffffff",
   });
 
+  const getEditIconButtonStyle = () => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "6px 12px",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#f1f3f5",
+    border: isDarkMode ? "1px solid #2a2a2a" : "1px solid #e9ecef",
+    borderRadius: "8px",
+    color: isDarkMode ? "#ffffff" : "#212529",
+    fontSize: "0.75rem",
+    fontWeight: "600",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  });
+
   const getMessageTenantPillBtn = (): React.CSSProperties => ({
     ...getBaseButtonStyle(),
     display: "inline-block",
@@ -662,6 +800,9 @@ export default function TenantDashboard() {
                   }}
                 >
                   TEN-{selectedTenant.id.toString().padStart(3, "0")} · {selectedTenant.name}
+                  {selectedTenant.is_verified && (
+                    <span style={getVerifiedBadgeStyle()}>🛡️ Verified Tenant</span>
+                  )}
                 </h2>
               </div>
               <a
@@ -704,28 +845,44 @@ export default function TenantDashboard() {
                 <span style={getMetaFieldValue()}>{selectedTenant.status}</span>
               </div>
               <div style={getMetaFieldGroup()}>
-                <span style={getMetaFieldLabel()}>WhatsApp</span>
-                <span style={{ ...getMetaFieldValue(), color: "#38bdf8" }}>
-                  +{selectedTenant.whatsapp_number}
+                <span style={getMetaFieldLabel()}>Searching status</span>
+                <span style={getStatusPillStyle(selectedTenant.is_searching ?? true)}>
+                  {selectedTenant.is_searching ? "Searching" : "Placed"}
                 </span>
               </div>
+              {selectedTenant.searching_confirmed_date && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Searching confirmed date</span>
+                  <span style={getMetaFieldValue()}>{selectedTenant.searching_confirmed_date}</span>
+                </div>
+              )}
+              {selectedTenant.preferred_move_in_date && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Preferred move-in date</span>
+                  <span style={getMetaFieldValue()}>{selectedTenant.preferred_move_in_date}</span>
+                </div>
+              )}
+              {selectedTenant.lease_length_wanted && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Lease length wanted</span>
+                  <span style={getMetaFieldValue()}>{selectedTenant.lease_length_wanted}</span>
+                </div>
+              )}
+              {selectedTenant.number_of_occupants && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Number of occupants</span>
+                  <span style={getMetaFieldValue()}>{selectedTenant.number_of_occupants}</span>
+                </div>
+              )}
               <div style={getMetaFieldGroup()}>
                 <span style={getMetaFieldLabel()}>Utilities requested</span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-                  {selectedTenant.needs_borehole && (
-                    <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
-                  )}
-                  {selectedTenant.needs_municipal_water && (
-                    <span style={getUtilityBadgeStyle()}>🏢 Council</span>
-                  )}
-                  {selectedTenant.needs_solar_backup && (
-                    <span style={getUtilityBadgeStyle()}>💡 Solar</span>
-                  )}
-                  {!selectedTenant.needs_borehole &&
-                    !selectedTenant.needs_municipal_water &&
-                    !selectedTenant.needs_solar_backup && (
-                      <span style={{ color: isDarkMode ? "#777" : "#6c757d", fontSize: "0.85rem" }}>None requested</span>
-                    )}
+                  {selectedTenant.needs_borehole && <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>}
+                  {selectedTenant.needs_municipal_water && <span style={getUtilityBadgeStyle()}>🏢 Council</span>}
+                  {selectedTenant.needs_solar_backup && <span style={getUtilityBadgeStyle()}>💡 Solar</span>}
+                  {selectedTenant.needs_security && <span style={getUtilityBadgeStyle()}>🛡️ Security</span>}
+                  {selectedTenant.needs_parking && <span style={getUtilityBadgeStyle()}>🚗 Parking</span>}
+                  {selectedTenant.needs_internet && <span style={getUtilityBadgeStyle()}>📶 Internet</span>}
                 </div>
               </div>
             </div>
@@ -748,6 +905,28 @@ export default function TenantDashboard() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowForm(!showForm);
+                    if (!showForm) {
+                      setEditingId(null);
+                      setFormData({
+                        name: "",
+                        city: "Harare",
+                        preferred_suburb: "",
+                        room_type_wanted: "Single Room / Bed Sitter",
+                        max_price: "",
+                        whatsapp_number: "",
+                        status: "Searching",
+                        searching_confirmed_date: "",
+                        preferred_move_in_date: "",
+                        lease_length_wanted: "",
+                        number_of_occupants: "",
+                      });
+                      setNeedsBorehole(false);
+                      setNeedsMunicipalWater(false);
+                      setNeedsSolarBackup(false);
+                      setNeedsSecurity(false);
+                      setNeedsParking(false);
+                      setNeedsInternet(false);
+                    }
                   }}
                   style={{
                     backgroundColor: showForm ? (isDarkMode ? "#1f2937" : "#e9ecef") : "#217d9d",
@@ -811,19 +990,20 @@ export default function TenantDashboard() {
                 <table style={getMainDataTableLayout()}>
                   <thead>
                     <tr style={getTableHeaderRowStyle()}>
-                      <th style={getThColumnHeadingStyle()}>Tenant ↕</th>
-                      <th style={getThColumnHeadingStyle()}>Location ↕</th>
+                      <th style={getThColumnHeadingStyle()}>TENANT ↕</th>
+                      <th style={getThColumnHeadingStyle()}>LOCATION ↕</th>
                       <th style={getThColumnHeadingStyle()}>PROPERTY TYPE ↕</th>
-                      <th style={getThColumnHeadingStyle()}>Budget ↕</th>
+                      <th style={getThColumnHeadingStyle()}>BUDGET ↕</th>
                       <th style={getThColumnHeadingStyle()}>UTILITIES ↕</th>
-                      <th style={getThColumnHeadingStyle()}>Status ↕</th>
+                      <th style={getThColumnHeadingStyle()}>STATUS ↕</th>
+                      <th style={getThColumnHeadingStyle()}>ACTIONS ↕</th>
                     </tr>
                   </thead>
                   <tbody>
                     {statusLoading ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           Loading...
@@ -832,7 +1012,7 @@ export default function TenantDashboard() {
                     ) : filteredTenants.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           No active records found.
@@ -853,10 +1033,14 @@ export default function TenantDashboard() {
                               ...getTdCellStyle(),
                               fontWeight: "700",
                               color: isDarkMode ? "#fff" : "#212529",
-                              textDecoration: "underline",
                             }}
                           >
-                            {item.name}
+                            <div>
+                              {item.name}
+                              {item.is_verified && (
+                                <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                              )}
+                            </div>
                           </td>
                           <td style={getTdCellStyle()}>
                             <span style={{ fontWeight: "700", color: isDarkMode ? "#ffffff" : "#212529" }}>
@@ -876,34 +1060,35 @@ export default function TenantDashboard() {
                           <td style={{ ...getTdCellStyle(), fontWeight: "700" }}>${item.max_price}/mo</td>
                           <td style={getTdCellStyle()}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                              {item.needs_borehole && (
-                                <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
-                              )}
-                              {item.needs_municipal_water && (
-                                <span style={getUtilityBadgeStyle()}>🏢 Council</span>
-                              )}
-                              {item.needs_solar_backup && (
-                                <span style={getUtilityBadgeStyle()}>💡 Solar</span>
-                              )}
-                              {!item.needs_borehole &&
-                                !item.needs_municipal_water &&
-                                !item.needs_solar_backup && (
-                                  <span style={{ color: isDarkMode ? "#666" : "#6c757d", fontSize: "0.75rem" }}>—</span>
-                                )}
+                              {item.needs_borehole && <span style={getUtilityBadgeStyle()}>🚰</span>}
+                              {item.needs_municipal_water && <span style={getUtilityBadgeStyle()}>🏢</span>}
+                              {item.needs_solar_backup && <span style={getUtilityBadgeStyle()}>💡</span>}
+                              {item.needs_security && <span style={getUtilityBadgeStyle()}>🛡️</span>}
+                              {item.needs_parking && <span style={getUtilityBadgeStyle()}>🚗</span>}
+                              {item.needs_internet && <span style={getUtilityBadgeStyle()}>📶</span>}
                             </div>
                           </td>
                           <td style={getTdCellStyle()}>
                             <span
-                              style={
-                                item.status === "Matched"
-                                  ? getMatchedBadgeStyle()
-                                  : item.status === "Placed"
-                                  ? getPlacedBadgeStyle()
-                                  : getSearchingBadgeStyle()
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleSearching(item);
+                              }}
+                              style={getStatusPillStyle(item.is_searching ?? true)}
                             >
-                              {item.status || "Searching"}
+                              {item.is_searching ? "Searching" : "Placed"}
                             </span>
+                          </td>
+                          <td style={getTdCellStyle()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditTenant(item);
+                              }}
+                              style={getEditIconButtonStyle()}
+                            >
+                              ✏️ Edit
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -915,9 +1100,11 @@ export default function TenantDashboard() {
 
             {showForm && (
               <div style={getFormWrapperCardStyle()}>
-                <h2 style={getFormTitleStyle()}>Quick tenant intake</h2>
+                <h2 style={getFormTitleStyle()}>
+                  {editingId ? "Update tenant profile" : "Quick tenant intake"}
+                </h2>
                 <p style={getFormSubtitleStyle()}>
-                  Capture a WhatsApp enquiry and add it to the matching queue.
+                  {editingId ? "Edit the tenant details below." : "Capture a WhatsApp enquiry and add it to the matching queue."}
                 </p>
 
                 <form onSubmit={handleFormSubmit} style={getFormGridStructure()}>
@@ -999,6 +1186,53 @@ export default function TenantDashboard() {
                     />
                   </div>
 
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Searching confirmed date</label>
+                    <input
+                      type="date"
+                      name="searching_confirmed_date"
+                      value={formData.searching_confirmed_date}
+                      onChange={handleInputChange}
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Preferred move-in date</label>
+                    <input
+                      type="date"
+                      name="preferred_move_in_date"
+                      value={formData.preferred_move_in_date}
+                      onChange={handleInputChange}
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Lease length wanted</label>
+                    <input
+                      type="text"
+                      name="lease_length_wanted"
+                      value={formData.lease_length_wanted}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 6-12 Months"
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Number of occupants</label>
+                    <input
+                      type="number"
+                      name="number_of_occupants"
+                      value={formData.number_of_occupants}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 2"
+                      min="1"
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
                   <div style={getUtilityCardBoxStyle()}>
                     <label style={getCheckboxLabelStyle()}>
                       <input
@@ -1018,7 +1252,7 @@ export default function TenantDashboard() {
                       />
                       Council municipal water line
                     </label>
-                    <label style={{ ...getCheckboxLabelStyle(), marginBottom: 0 }}>
+                    <label style={getCheckboxLabelStyle()}>
                       <input
                         type="checkbox"
                         checked={needs_solar_backup}
@@ -1026,6 +1260,33 @@ export default function TenantDashboard() {
                         style={getCheckboxStyle()}
                       />
                       Constant solar electrical backup
+                    </label>
+                    <label style={getCheckboxLabelStyle()}>
+                      <input
+                        type="checkbox"
+                        checked={needs_security}
+                        onChange={e => setNeedsSecurity(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      Security monitoring guard
+                    </label>
+                    <label style={getCheckboxLabelStyle()}>
+                      <input
+                        type="checkbox"
+                        checked={needs_parking}
+                        onChange={e => setNeedsParking(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      Secure parking slot space
+                    </label>
+                    <label style={{ ...getCheckboxLabelStyle(), marginBottom: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={needs_internet}
+                        onChange={e => setNeedsInternet(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      High-speed internet connection link
                     </label>
                   </div>
 
@@ -1036,7 +1297,7 @@ export default function TenantDashboard() {
                   )}
 
                   <button type="submit" style={getSubmitPillBtnStyle()}>
-                    Save tenant profile
+                    {editingId ? "Update tenant profile" : "Save tenant profile"}
                   </button>
                 </form>
               </div>

@@ -14,8 +14,17 @@ interface PropertyListing {
   has_municipal_water?: boolean;
   has_solar_backup?: boolean;
   has_electricity?: boolean;
+  has_security?: boolean;
+  has_parking?: boolean;
+  has_internet?: boolean;
   whatsapp_number: string;
   status?: string;
+  is_available?: boolean;
+  is_verified?: boolean;
+  availability_date?: string;
+  preferred_move_in_date?: string;
+  lease_length?: string;
+  max_occupants?: number;
 }
 
 interface PropertyFormData {
@@ -25,6 +34,10 @@ interface PropertyFormData {
   room_type: string;
   price: string;
   status: string;
+  availability_date: string;
+  preferred_move_in_date: string;
+  lease_length: string;
+  max_occupants: string;
 }
 
 const CITIES = ["Harare", "Bulawayo", "Mutare", "Gweru"];
@@ -158,11 +171,7 @@ export default function PropertiesDashboard() {
       setIsDarkMode(savedTheme === null ? true : savedTheme === 'dark');
     };
 
-    // Initial sync with localStorage, deferred to just before the next
-    // paint so the effect body itself never calls setState synchronously.
     const raf = requestAnimationFrame(readTheme);
-
-    // Keep this page's theme in sync when it is toggled on another page.
     window.addEventListener('themeChange', readTheme);
     return () => {
       cancelAnimationFrame(raf);
@@ -191,6 +200,7 @@ export default function PropertiesDashboard() {
   const [filterStatus, setFilterStatus] = useState("All statuses");
   const [filterCity, setFilterCity] = useState("All cities");
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
 
   const [showIntake, setShowIntake] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -202,11 +212,18 @@ export default function PropertiesDashboard() {
     room_type: "Single Room / Bed Sitter",
     price: "",
     status: "Available",
+    availability_date: "",
+    preferred_move_in_date: "",
+    lease_length: "",
+    max_occupants: "",
   });
 
   const [has_borehole, setHasBorehole] = useState(false);
   const [has_municipal_water, setHasMunicipalWater] = useState(false);
   const [has_solar_backup, setHasSolarBackup] = useState(false);
+  const [has_security, setHasSecurity] = useState(false);
+  const [has_parking, setHasParking] = useState(false);
+  const [has_internet, setHasInternet] = useState(false);
 
   const fetchProperties = async () => {
     const { data, error } = await supabase
@@ -280,24 +297,66 @@ export default function PropertiesDashboard() {
     setSubmitError(null);
     const cleanPhone = String(formData.whatsapp_number || "").replace(/[^0-9]/g, "");
     const rentPrice = parseFloat(formData.price);
+    const maxOccupants = parseInt(formData.max_occupants) || null;
 
-    const { error } = await supabase.from("landlord_listings").insert([
-      {
-        whatsapp_number: cleanPhone,
-        city: formData.city,
-        suburb: formData.suburb.trim() || null,
-        room_type: formData.room_type,
-        price: rentPrice,
-        has_borehole,
-        has_municipal_water,
-        has_solar_backup,
-        has_electricity: has_solar_backup,
-      },
-    ]);
+    if (editingId) {
+      // Update existing listing
+      const { error } = await supabase
+        .from("landlord_listings")
+        .update({
+          whatsapp_number: cleanPhone,
+          city: formData.city,
+          suburb: formData.suburb.trim() || null,
+          room_type: formData.room_type,
+          price: rentPrice,
+          has_borehole,
+          has_municipal_water,
+          has_solar_backup,
+          has_electricity: has_solar_backup,
+          has_security,
+          has_parking,
+          has_internet,
+          availability_date: formData.availability_date || null,
+          preferred_move_in_date: formData.preferred_move_in_date || null,
+          lease_length: formData.lease_length || null,
+          max_occupants: maxOccupants,
+        })
+        .eq('id', editingId);
 
-    if (error) {
-      setSubmitError(error.message);
-      return;
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+      setEditingId(null);
+    } else {
+      // Insert new listing
+      const { error } = await supabase.from("landlord_listings").insert([
+        {
+          whatsapp_number: cleanPhone,
+          city: formData.city,
+          suburb: formData.suburb.trim() || null,
+          room_type: formData.room_type,
+          price: rentPrice,
+          has_borehole,
+          has_municipal_water,
+          has_solar_backup,
+          has_electricity: has_solar_backup,
+          has_security,
+          has_parking,
+          has_internet,
+          availability_date: formData.availability_date || null,
+          preferred_move_in_date: formData.preferred_move_in_date || null,
+          lease_length: formData.lease_length || null,
+          max_occupants: maxOccupants,
+          is_available: true,
+          is_verified: false,
+        },
+      ]);
+
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
     }
 
     setFormData({
@@ -307,11 +366,54 @@ export default function PropertiesDashboard() {
       room_type: "Single Room / Bed Sitter",
       price: "",
       status: "Available",
+      availability_date: "",
+      preferred_move_in_date: "",
+      lease_length: "",
+      max_occupants: "",
     });
     setHasBorehole(false);
     setHasMunicipalWater(false);
     setHasSolarBackup(false);
+    setHasSecurity(false);
+    setHasParking(false);
+    setHasInternet(false);
+    setShowIntake(false);
     fetchProperties();
+  };
+
+  const handleEditProperty = (property: PropertyListing) => {
+    setEditingId(property.id);
+    setFormData({
+      whatsapp_number: property.whatsapp_number || "",
+      city: property.city,
+      suburb: property.suburb || "",
+      room_type: property.room_type,
+      price: String(property.price),
+      status: property.status || "Available",
+      availability_date: property.availability_date || "",
+      preferred_move_in_date: property.preferred_move_in_date || "",
+      lease_length: property.lease_length || "",
+      max_occupants: String(property.max_occupants || ""),
+    });
+    setHasBorehole(property.has_borehole || false);
+    setHasMunicipalWater(property.has_municipal_water || false);
+    setHasSolarBackup(property.has_solar_backup || false);
+    setHasSecurity(property.has_security || false);
+    setHasParking(property.has_parking || false);
+    setHasInternet(property.has_internet || false);
+    setShowIntake(true);
+  };
+
+  const handleToggleAvailability = async (property: PropertyListing) => {
+    const newStatus = !property.is_available;
+    const { error } = await supabase
+      .from("landlord_listings")
+      .update({ is_available: newStatus })
+      .eq('id', property.id);
+
+    if (!error) {
+      fetchProperties();
+    }
   };
 
   const whatsappLink = (number: string | number, message: string) => {
@@ -332,7 +434,7 @@ export default function PropertiesDashboard() {
     display: "flex",
     flexDirection: "column",
     margin: 0,
-    padding: "0 16px var(--bottom-nav-clearance) 16px",
+    padding: "0 16px 90px 16px",
     color: isDarkMode ? "#ffffff" : "#212529",
     flex: 1,
     boxSizing: "border-box" as const,
@@ -362,15 +464,15 @@ export default function PropertiesDashboard() {
   });
 
   const getSearchBarFieldStyle = (): React.CSSProperties => ({
-    boxSizing: "border-box",
-    width: "100%",
-    padding: "12px 16px",
-    backgroundColor: isDarkMode ? "#111111" : "#f1f3f5",
-    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
-    borderRadius: "24px",
-    color: isDarkMode ? "#ffffff" : "#212529",
-    fontSize: "0.95rem",
-    outline: "none",
+    boxSizing: 'border-box',
+    width: '100%',
+    padding: '12px 16px',
+    backgroundColor: isDarkMode ? '#111111' : '#f1f3f5',
+    border: isDarkMode ? '1px solid #222' : '1px solid #e9ecef',
+    borderRadius: '24px',
+    color: isDarkMode ? '#ffffff' : '#212529',
+    fontSize: '0.95rem',
+    outline: 'none',
   });
 
   const getFilterSuiteContainerStyle = (): React.CSSProperties => ({
@@ -399,7 +501,7 @@ export default function PropertiesDashboard() {
 
   const getMainDataTableLayout = (): React.CSSProperties => ({
     width: "100%",
-    minWidth: "600px",
+    minWidth: "800px",
     borderCollapse: "collapse",
     textAlign: "left",
   });
@@ -448,6 +550,20 @@ export default function PropertiesDashboard() {
     color: isDarkMode ? "#888888" : "#6c757d",
   });
 
+  const getVerifiedBadgeStyle = () => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "4px 10px",
+    borderRadius: "12px",
+    fontSize: "0.72rem",
+    fontWeight: "700",
+    backgroundColor: "rgba(33, 125, 157, 0.1)",
+    color: "#217d9d",
+    border: "1px solid #217d9d",
+    marginLeft: "8px",
+  });
+
   const getUtilityBadgeStyle = () => ({
     display: "inline-flex",
     alignItems: "center",
@@ -460,6 +576,14 @@ export default function PropertiesDashboard() {
     color: "#38bdf8",
     border: "1px solid #1e3a4b",
     whiteSpace: "nowrap",
+  });
+
+  const getStatusPillStyle = (isAvailable: boolean) => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: isAvailable ? "#132f1d" : "#3a230f",
+    color: isAvailable ? "#10b981" : "#f59e0b",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
   });
 
   const getFormCardStyle = (): React.CSSProperties => ({
@@ -565,6 +689,21 @@ export default function PropertiesDashboard() {
     color: "#ffffff",
   });
 
+  const getEditIconButtonStyle = () => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "6px 12px",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#f1f3f5",
+    border: isDarkMode ? "1px solid #2a2a2a" : "1px solid #e9ecef",
+    borderRadius: "8px",
+    color: isDarkMode ? "#ffffff" : "#212529",
+    fontSize: "0.75rem",
+    fontWeight: "600",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  });
+
   const getMessageTenantPillBtn = (): React.CSSProperties => ({
     ...getBaseButtonStyle(),
     display: "inline-block",
@@ -652,6 +791,9 @@ export default function PropertiesDashboard() {
                   }}
                 >
                   PROP-{selectedProperty.id.toString().padStart(3, "0")} · {selectedProperty.room_type}
+                  {selectedProperty.is_verified && (
+                    <span style={getVerifiedBadgeStyle()}>🛡️ Verified Listing</span>
+                  )}
                 </h2>
               </div>
               <a
@@ -685,33 +827,44 @@ export default function PropertiesDashboard() {
                 </span>
               </div>
               <div style={getMetaFieldGroup()}>
-                <span style={getMetaFieldLabel()}>Listing status</span>
-                <span style={getMetaFieldValue()}>{selectedProperty.status || "Available"}</span>
-              </div>
-              <div style={getMetaFieldGroup()}>
-                <span style={getMetaFieldLabel()}>WhatsApp</span>
-                <span style={{ ...getMetaFieldValue(), color: "#38bdf8" }}>
-                  +{selectedProperty.whatsapp_number}
+                <span style={getMetaFieldLabel()}>Availability status</span>
+                <span style={getStatusPillStyle(selectedProperty.is_available ?? true)}>
+                  {selectedProperty.is_available ? "Available" : "Taken"}
                 </span>
               </div>
+              {selectedProperty.availability_date && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Availability confirmed date</span>
+                  <span style={getMetaFieldValue()}>{selectedProperty.availability_date}</span>
+                </div>
+              )}
+              {selectedProperty.preferred_move_in_date && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Preferred move-in date</span>
+                  <span style={getMetaFieldValue()}>{selectedProperty.preferred_move_in_date}</span>
+                </div>
+              )}
+              {selectedProperty.lease_length && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Lease length</span>
+                  <span style={getMetaFieldValue()}>{selectedProperty.lease_length}</span>
+                </div>
+              )}
+              {selectedProperty.max_occupants && (
+                <div style={getMetaFieldGroup()}>
+                  <span style={getMetaFieldLabel()}>Max occupants allowed</span>
+                  <span style={getMetaFieldValue()}>{selectedProperty.max_occupants}</span>
+                </div>
+              )}
               <div style={getMetaFieldGroup()}>
                 <span style={getMetaFieldLabel()}>Utilities included</span>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-                  {selectedProperty.has_borehole && (
-                    <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
-                  )}
-                  {selectedProperty.has_municipal_water && (
-                    <span style={getUtilityBadgeStyle()}>🏢 Council</span>
-                  )}
-                  {(selectedProperty.has_solar_backup || selectedProperty.has_electricity) && (
-                    <span style={getUtilityBadgeStyle()}>💡 Solar</span>
-                  )}
-                  {!selectedProperty.has_borehole &&
-                    !selectedProperty.has_municipal_water &&
-                    !selectedProperty.has_solar_backup &&
-                    !selectedProperty.has_electricity && (
-                      <span style={{ color: isDarkMode ? "#777" : "#6c757d", fontSize: "0.85rem" }}>None specified</span>
-                    )}
+                  {selectedProperty.has_borehole && <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>}
+                  {selectedProperty.has_municipal_water && <span style={getUtilityBadgeStyle()}>🏢 Council</span>}
+                  {selectedProperty.has_solar_backup && <span style={getUtilityBadgeStyle()}>💡 Solar</span>}
+                  {selectedProperty.has_security && <span style={getUtilityBadgeStyle()}>🛡️ Security</span>}
+                  {selectedProperty.has_parking && <span style={getUtilityBadgeStyle()}>🚗 Parking</span>}
+                  {selectedProperty.has_internet && <span style={getUtilityBadgeStyle()}>📶 Internet</span>}
                 </div>
               </div>
             </div>
@@ -722,7 +875,7 @@ export default function PropertiesDashboard() {
               }} 
               style={getCloseDetailPanelBtn()}
             >
-              ← Back to Properties Grid
+              ← Back to Property Grid
             </div>
           </div>
         ) : (
@@ -734,6 +887,27 @@ export default function PropertiesDashboard() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowIntake(!showIntake);
+                    if (!showIntake) {
+                      setEditingId(null);
+                      setFormData({
+                        whatsapp_number: "",
+                        city: "Harare",
+                        suburb: "",
+                        room_type: "Single Room / Bed Sitter",
+                        price: "",
+                        status: "Available",
+                        availability_date: "",
+                        preferred_move_in_date: "",
+                        lease_length: "",
+                        max_occupants: "",
+                      });
+                      setHasBorehole(false);
+                      setHasMunicipalWater(false);
+                      setHasSolarBackup(false);
+                      setHasSecurity(false);
+                      setHasParking(false);
+                      setHasInternet(false);
+                    }
                   }}
                   style={{
                     backgroundColor: showIntake ? (isDarkMode ? "#1f2937" : "#e9ecef") : "#217d9d",
@@ -747,7 +921,7 @@ export default function PropertiesDashboard() {
                     transition: "background-color 0.2s ease",
                   }}
                 >
-                  {showIntake ? "✕ Close Intake" : "＋ Quick Property Intake"}
+                  {showIntake ? "✕ Close Intake" : "＋ List Property"}
                 </div>
                 <button
                   onClick={(e) => {
@@ -772,7 +946,7 @@ export default function PropertiesDashboard() {
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search by name or ID"
+                placeholder="Search by ID, suburb, or type"
                 style={getSearchBarFieldStyle()}
                 className="filter-search-box"
               />
@@ -797,19 +971,20 @@ export default function PropertiesDashboard() {
                 <table style={getMainDataTableLayout()}>
                   <thead>
                     <tr style={getTableHeaderRowStyle()}>
-                      <th style={getThColumnHeadingStyle()}>PROPERTY TYPE ↕</th>
+                      <th style={getThColumnHeadingStyle()}>PROPERTY ↕</th>
                       <th style={getThColumnHeadingStyle()}>LOCATION ↕</th>
                       <th style={getThColumnHeadingStyle()}>RENT ↕</th>
                       <th style={getThColumnHeadingStyle()}>UTILITIES ↕</th>
                       <th style={getThColumnHeadingStyle()}>STATUS ↕</th>
+                      <th style={getThColumnHeadingStyle()}>ACTIONS ↕</th>
                     </tr>
                   </thead>
                   <tbody>
                     {statusLoading ? (
                       <tr>
                         <td
-                          colSpan={5}
-                          style={{ padding: "24px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
+                          colSpan={6}
+                          style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           Loading...
                         </td>
@@ -817,8 +992,8 @@ export default function PropertiesDashboard() {
                     ) : filteredProperties.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
-                          style={{ padding: "24px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
+                          colSpan={6}
+                          style={{ padding: "20px", color: isDarkMode ? "#666" : "#6c757d", textAlign: "center" }}
                         >
                           No active records found.
                         </td>
@@ -833,24 +1008,18 @@ export default function PropertiesDashboard() {
                           }}
                           style={getTableRowStyle()}
                         >
-                          <td style={getTdCellStyle()}>
-                            <div
-                              style={{
-                                fontWeight: "700",
-                                color: isDarkMode ? "#ffffff" : "#212529",
-                              }}
-                            >
+                          <td
+                            style={{
+                              ...getTdCellStyle(),
+                              fontWeight: "700",
+                              color: isDarkMode ? "#fff" : "#212529",
+                            }}
+                          >
+                            <div>
                               {item.room_type}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.75rem",
-                                color: isDarkMode ? "#888888" : "#6c757d",
-                                marginTop: "2px",
-                                textDecoration: "underline",
-                              }}
-                            >
-                              PROP-{item.id.toString().padStart(3, "0")}
+                              {item.is_verified && (
+                                <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                              )}
                             </div>
                           </td>
                           <td style={getTdCellStyle()}>
@@ -858,38 +1027,38 @@ export default function PropertiesDashboard() {
                               {item.suburb ? `${item.suburb}, ` : ""}{item.city}
                             </span>
                           </td>
-                          <td style={{ ...getTdCellStyle(), color: "#10b981", fontWeight: "700" }}>
-                            ${item.price}/mo
-                          </td>
+                          <td style={{ ...getTdCellStyle(), fontWeight: "700" }}>${item.price}/mo</td>
                           <td style={getTdCellStyle()}>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                              {item.has_borehole && (
-                                <span style={getUtilityBadgeStyle()}>🚰 Borehole</span>
-                              )}
-                              {item.has_municipal_water && (
-                                <span style={getUtilityBadgeStyle()}>🏢 Council</span>
-                              )}
-                              {(item.has_solar_backup || item.has_electricity) && (
-                                <span style={getUtilityBadgeStyle()}>💡 Solar</span>
-                              )}
-                              {!item.has_borehole &&
-                                !item.has_municipal_water &&
-                                !item.has_solar_backup &&
-                                !item.has_electricity && (
-                                  <span style={{ color: isDarkMode ? "#666" : "#6c757d", fontSize: "0.75rem" }}>—</span>
-                                )}
+                              {item.has_borehole && <span style={getUtilityBadgeStyle()}>🚰</span>}
+                              {item.has_municipal_water && <span style={getUtilityBadgeStyle()}>🏢</span>}
+                              {item.has_solar_backup && <span style={getUtilityBadgeStyle()}>💡</span>}
+                              {item.has_security && <span style={getUtilityBadgeStyle()}>🛡️</span>}
+                              {item.has_parking && <span style={getUtilityBadgeStyle()}>🚗</span>}
+                              {item.has_internet && <span style={getUtilityBadgeStyle()}>📶</span>}
                             </div>
                           </td>
                           <td style={getTdCellStyle()}>
                             <span
-                              style={
-                                item.status === "Occupied"
-                                  ? getOccupiedBadgeStyle()
-                                  : getAvailableBadgeStyle()
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleAvailability(item);
+                              }}
+                              style={getStatusPillStyle(item.is_available ?? true)}
                             >
-                              {item.status || "Available"}
+                              {item.is_available ? "Available" : "Taken"}
                             </span>
+                          </td>
+                          <td style={getTdCellStyle()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditProperty(item);
+                              }}
+                              style={getEditIconButtonStyle()}
+                            >
+                              ✏️ Edit
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -901,9 +1070,11 @@ export default function PropertiesDashboard() {
 
             {showIntake && (
               <div style={getFormCardStyle()}>
-                <h2 style={getFormTitleStyle()}>Quick property intake</h2>
+                <h2 style={getFormTitleStyle()}>
+                  {editingId ? "Update property profile" : "List a new property"}
+                </h2>
                 <p style={getFormSubtitleStyle()}>
-                  Capture a landlord listing and add it to the matching queue
+                  {editingId ? "Edit the property details below." : "Add a vacant property room to the marketplace."}
                 </p>
 
                 <form onSubmit={handleFormSubmit} style={getFormGridStructure()}>
@@ -924,7 +1095,7 @@ export default function PropertiesDashboard() {
                   </div>
 
                   <div style={getFieldBlockStyle()}>
-                    <label style={getLabelStyle()}>Target city</label>
+                    <label style={getLabelStyle()}>City</label>
                     <CustomDropdown
                       value={formData.city}
                       options={CITIES}
@@ -935,13 +1106,13 @@ export default function PropertiesDashboard() {
                   </div>
 
                   <div style={getFieldBlockStyle()}>
-                    <label style={getLabelStyle()}>Target suburb or area</label>
+                    <label style={getLabelStyle()}>Suburb or area</label>
                     <input
                       type="text"
                       name="suburb"
                       value={formData.suburb}
                       onChange={handleInputChange}
-                      placeholder="e.g. Avondale"
+                      placeholder="e.g. Avondale (optional)"
                       style={getInputBoxStyle()}
                     />
                   </div>
@@ -958,7 +1129,7 @@ export default function PropertiesDashboard() {
                   </div>
 
                   <div style={getFieldBlockStyle()}>
-                    <label style={getLabelStyle()}>Monthly rent price</label>
+                    <label style={getLabelStyle()}>Monthly rent (USD)</label>
                     <input
                       type="number"
                       name="price"
@@ -968,6 +1139,53 @@ export default function PropertiesDashboard() {
                       min="0"
                       step="1"
                       required
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Availability confirmed date</label>
+                    <input
+                      type="date"
+                      name="availability_date"
+                      value={formData.availability_date}
+                      onChange={handleInputChange}
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Preferred move-in date</label>
+                    <input
+                      type="date"
+                      name="preferred_move_in_date"
+                      value={formData.preferred_move_in_date}
+                      onChange={handleInputChange}
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Lease length / duration</label>
+                    <input
+                      type="text"
+                      name="lease_length"
+                      value={formData.lease_length}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 6-12 Months"
+                      style={getInputBoxStyle()}
+                    />
+                  </div>
+
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Max occupants allowed</label>
+                    <input
+                      type="number"
+                      name="max_occupants"
+                      value={formData.max_occupants}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 2"
+                      min="1"
                       style={getInputBoxStyle()}
                     />
                   </div>
@@ -991,7 +1209,7 @@ export default function PropertiesDashboard() {
                       />
                       Council municipal water line
                     </label>
-                    <label style={{ ...getCheckboxLabelStyle(), marginBottom: 0 }}>
+                    <label style={getCheckboxLabelStyle()}>
                       <input
                         type="checkbox"
                         checked={has_solar_backup}
@@ -999,6 +1217,33 @@ export default function PropertiesDashboard() {
                         style={getCheckboxStyle()}
                       />
                       Constant solar electrical backup
+                    </label>
+                    <label style={getCheckboxLabelStyle()}>
+                      <input
+                        type="checkbox"
+                        checked={has_security}
+                        onChange={e => setHasSecurity(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      Security monitoring guard
+                    </label>
+                    <label style={getCheckboxLabelStyle()}>
+                      <input
+                        type="checkbox"
+                        checked={has_parking}
+                        onChange={e => setHasParking(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      Secure parking slot space
+                    </label>
+                    <label style={{ ...getCheckboxLabelStyle(), marginBottom: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={has_internet}
+                        onChange={e => setHasInternet(e.target.checked)}
+                        style={getCheckboxStyle()}
+                      />
+                      High-speed internet connection link
                     </label>
                   </div>
 
@@ -1009,7 +1254,7 @@ export default function PropertiesDashboard() {
                   )}
 
                   <button type="submit" style={getSubmitPillBtnStyle()}>
-                    Save property profile
+                    {editingId ? "Update property profile" : "Save property profile"}
                   </button>
                 </form>
               </div>

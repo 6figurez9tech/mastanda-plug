@@ -323,14 +323,15 @@ export default function PropertiesDashboard() {
           continue;
         }
 
+        // Generate unique timestamp-based file name every time (create or edit mode)
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `property-images/${fileName}`;
+        const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `listings/${uniqueFileName}`;
 
         try {
           const { error: uploadError } = await supabase.storage
             .from('property-images')
-            .upload(filePath, file);
+            .upload(filePath, file, { upsert: false });
 
           if (uploadError) {
             console.error('Storage upload error:', uploadError);
@@ -350,6 +351,7 @@ export default function PropertiesDashboard() {
         }
       }
 
+      // Clean state update - append new URLs without mutating old array pointers
       setUploadedImageUrls(prev => [...prev, ...urls]);
     } catch (error) {
       console.error('Image upload error:', error);
@@ -384,11 +386,14 @@ export default function PropertiesDashboard() {
         .eq('id', editingId)
         .single();
 
-      if (existingProperty && existingProperty.image_urls) {
+      if (existingProperty) {
         // Merge existing images with newly uploaded ones (deduplicate)
         const existingUrls = Array.isArray(existingProperty.image_urls) ? existingProperty.image_urls : [];
         const allUrls = [...existingUrls, ...uploadedImageUrls];
         finalImageUrls = Array.from(new Set(allUrls)); // Remove duplicates
+        console.log('Edit mode - Merged image URLs:', finalImageUrls);
+      } else {
+        console.log('Edit mode - No existing property found, using new images only:', finalImageUrls);
       }
     }
 
@@ -415,15 +420,31 @@ export default function PropertiesDashboard() {
 
     if (editingId) {
       // Update existing listing
+      console.log('Updating property with ID:', editingId, 'and image_urls:', finalImageUrls);
       const { error } = await supabase
         .from("landlord_listings")
         .update(listingData)
         .eq('id', editingId);
 
       if (error) {
+        console.error('Update error:', error);
         setSubmitError(error.message);
         return;
       }
+      console.log('Update successful');
+
+      // Live modal state sync on update - force the active open detail modal view to receive the new image array instantly
+      if (selectedProperty && selectedProperty.id === editingId) {
+        setSelectedProperty({
+          ...selectedProperty,
+          image_urls: finalImageUrls
+        });
+      }
+
+      // Immediate post-update data re-fetch to get fresh records
+      await fetchProperties();
+
+      // State variable synchronization reset
       setEditingId(null);
     } else {
       // Insert new listing
@@ -444,8 +465,12 @@ export default function PropertiesDashboard() {
         setJustSavedId(data[0].id);
         setShowVerification(true);
       }
+
+      // Fetch properties after insert
+      await fetchProperties();
     }
 
+    // Reset states only after successful update/insert
     setFormData({
       whatsapp_number: "",
       city: "Harare",
@@ -467,7 +492,6 @@ export default function PropertiesDashboard() {
     setImageFiles([]);
     setUploadedImageUrls([]);
     setShowIntake(false);
-    fetchProperties();
   };
 
   const handleEditProperty = (property: PropertyListing) => {

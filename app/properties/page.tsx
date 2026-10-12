@@ -25,6 +25,8 @@ interface PropertyListing {
   preferred_move_in_date?: string;
   lease_length?: string;
   max_occupants?: number;
+  created_by?: string;
+  image_urls?: string[];
 }
 
 interface PropertyFormData {
@@ -194,6 +196,16 @@ export default function PropertiesDashboard() {
     }
   };
 
+  // Device ownership tracking
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('mastanda_device_id');
+    if (!deviceId) {
+      deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('mastanda_device_id', deviceId);
+    }
+    return deviceId;
+  };
+
   const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [statusLoading, setStatusLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -201,9 +213,12 @@ export default function PropertiesDashboard() {
   const [filterCity, setFilterCity] = useState("All cities");
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [justSavedId, setJustSavedId] = useState<string | number | null>(null);
 
   const [showIntake, setShowIntake] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   const [formData, setFormData] = useState<PropertyFormData>({
     whatsapp_number: "",
@@ -224,6 +239,8 @@ export default function PropertiesDashboard() {
   const [has_security, setHasSecurity] = useState(false);
   const [has_parking, setHasParking] = useState(false);
   const [has_internet, setHasInternet] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
 
   const fetchProperties = async () => {
     const { data, error } = await supabase
@@ -292,35 +309,101 @@ export default function PropertiesDashboard() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    setUploadingImages(true);
+    const urls: string[] = [];
+
+    try {
+      for (const file of Array.from(files)) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `property-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('property-images')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('property-images')
+          .getPublicUrl(filePath);
+
+        urls.push(publicUrl);
+      }
+
+      setUploadedImageUrls(prev => [...prev, ...urls]);
+    } catch (error) {
+      console.error('Image upload error:', error);
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitError(null);
+
+    // Block submission if images are still uploading
+    if (uploadingImages) {
+      setSubmitError("Please wait for images to finish uploading.");
+      return;
+    }
+
     const cleanPhone = String(formData.whatsapp_number || "").replace(/[^0-9]/g, "");
     const rentPrice = parseFloat(formData.price);
     const maxOccupants = parseInt(formData.max_occupants) || null;
+    const deviceId = getDeviceId();
+
+    let finalImageUrls = uploadedImageUrls;
+
+    // If editing, fetch existing images and merge with newly uploaded ones
+    if (editingId) {
+      const { data: existingProperty } = await supabase
+        .from("landlord_listings")
+        .select("image_urls")
+        .eq('id', editingId)
+        .single();
+
+      if (existingProperty && existingProperty.image_urls) {
+        // Merge existing images with newly uploaded ones (deduplicate)
+        const existingUrls = Array.isArray(existingProperty.image_urls) ? existingProperty.image_urls : [];
+        const allUrls = [...existingUrls, ...uploadedImageUrls];
+        finalImageUrls = Array.from(new Set(allUrls)); // Remove duplicates
+      }
+    }
+
+    const listingData = {
+      whatsapp_number: cleanPhone,
+      city: formData.city,
+      suburb: formData.suburb.trim() || null,
+      room_type: formData.room_type,
+      price: rentPrice,
+      has_borehole,
+      has_municipal_water,
+      has_solar_backup,
+      has_electricity: has_solar_backup,
+      has_security,
+      has_parking,
+      has_internet,
+      availability_date: formData.availability_date || null,
+      preferred_move_in_date: formData.preferred_move_in_date || null,
+      lease_length: formData.lease_length || null,
+      max_occupants: maxOccupants,
+      image_urls: finalImageUrls,
+      created_by: deviceId,
+    };
 
     if (editingId) {
       // Update existing listing
       const { error } = await supabase
         .from("landlord_listings")
-        .update({
-          whatsapp_number: cleanPhone,
-          city: formData.city,
-          suburb: formData.suburb.trim() || null,
-          room_type: formData.room_type,
-          price: rentPrice,
-          has_borehole,
-          has_municipal_water,
-          has_solar_backup,
-          has_electricity: has_solar_backup,
-          has_security,
-          has_parking,
-          has_internet,
-          availability_date: formData.availability_date || null,
-          preferred_move_in_date: formData.preferred_move_in_date || null,
-          lease_length: formData.lease_length || null,
-          max_occupants: maxOccupants,
-        })
+        .update(listingData)
         .eq('id', editingId);
 
       if (error) {
@@ -330,32 +413,22 @@ export default function PropertiesDashboard() {
       setEditingId(null);
     } else {
       // Insert new listing
-      const { error } = await supabase.from("landlord_listings").insert([
+      const { data, error } = await supabase.from("landlord_listings").insert([
         {
-          whatsapp_number: cleanPhone,
-          city: formData.city,
-          suburb: formData.suburb.trim() || null,
-          room_type: formData.room_type,
-          price: rentPrice,
-          has_borehole,
-          has_municipal_water,
-          has_solar_backup,
-          has_electricity: has_solar_backup,
-          has_security,
-          has_parking,
-          has_internet,
-          availability_date: formData.availability_date || null,
-          preferred_move_in_date: formData.preferred_move_in_date || null,
-          lease_length: formData.lease_length || null,
-          max_occupants: maxOccupants,
+          ...listingData,
           is_available: true,
           is_verified: false,
         },
-      ]);
+      ]).select();
 
       if (error) {
         setSubmitError(error.message);
         return;
+      }
+
+      if (data && data[0]) {
+        setJustSavedId(data[0].id);
+        setShowVerification(true);
       }
     }
 
@@ -377,11 +450,21 @@ export default function PropertiesDashboard() {
     setHasSecurity(false);
     setHasParking(false);
     setHasInternet(false);
+    setImageFiles([]);
+    setUploadedImageUrls([]);
     setShowIntake(false);
     fetchProperties();
   };
 
   const handleEditProperty = (property: PropertyListing) => {
+    const deviceId = getDeviceId();
+
+    // Ownership lockout check
+    if (property.created_by && property.created_by !== deviceId) {
+      alert("Access Denied: You can only edit profiles or listings you registered yourself.");
+      return;
+    }
+
     setEditingId(property.id);
     setFormData({
       whatsapp_number: property.whatsapp_number || "",
@@ -401,7 +484,11 @@ export default function PropertiesDashboard() {
     setHasSecurity(property.has_security || false);
     setHasParking(property.has_parking || false);
     setHasInternet(property.has_internet || false);
+    setUploadedImageUrls(property.image_urls || []);
     setShowIntake(true);
+
+    // Automatic smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleToggleAvailability = async (property: PropertyListing) => {
@@ -548,6 +635,12 @@ export default function PropertiesDashboard() {
     ...getBaseBadgeStyle(),
     backgroundColor: isDarkMode ? "#2a2a2a" : "#e9ecef",
     color: isDarkMode ? "#888888" : "#6c757d",
+  });
+
+  const getPendingBadgeStyle = () => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: "#3a230f",
+    color: "#f59e0b",
   });
 
   const getVerifiedBadgeStyle = () => ({
@@ -754,6 +847,97 @@ export default function PropertiesDashboard() {
     color: isDarkMode ? "#ffffff" : "#212529",
   });
 
+  const getHeroImageStyle = () => ({
+    width: "100%",
+    height: "250px",
+    objectFit: "cover",
+    borderRadius: "16px",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
+  });
+
+  const getPlaceholderImageStyle = () => ({
+    width: "100%",
+    height: "250px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "16px",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
+    border: `2px dashed #217d9d`,
+  });
+
+  const getVerificationCardStyle = () => ({
+    backgroundColor: isDarkMode ? "#141414" : "#ffffff",
+    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
+    borderRadius: "20px",
+    padding: "32px 24px",
+    marginBottom: "24px",
+    boxShadow: isDarkMode ? "0 10px 15px -3px rgba(0,0,0,0.3)" : "0 10px 15px -3px rgba(0,0,0,0.1)",
+    width: "100%",
+    boxSizing: "border-box",
+  });
+
+  const getUploadZoneStyle = () => ({
+    border: `2px dashed ${isDarkMode ? "#2a2a2a" : "#e9ecef"}`,
+    borderRadius: "12px",
+    padding: "24px",
+    textAlign: "center" as const,
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    backgroundColor: isDarkMode ? "#0d0d0d" : "#f8f9fa",
+  });
+
+  const handleVerificationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const idFile = formData.get('national_id') as File;
+    const passportFile = formData.get('passport_photo') as File;
+
+    if (!idFile || !passportFile) {
+      alert("Please upload both documents to continue.");
+      return;
+    }
+
+    try {
+      // Upload National ID
+      const idExt = idFile.name.split('.').pop();
+      const idFileName = `verification_${Date.now()}_id.${idExt}`;
+      const idPath = `verification-documents/${idFileName}`;
+      await supabase.storage.from('verification-documents').upload(idPath, idFile);
+      const { data: { publicUrl: idPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(idPath);
+
+      // Upload Passport Photo
+      const passportExt = passportFile.name.split('.').pop();
+      const passportFileName = `verification_${Date.now()}_passport.${passportExt}`;
+      const passportPath = `verification-documents/${passportFileName}`;
+      await supabase.storage.from('verification-documents').upload(passportPath, passportFile);
+      const { data: { publicUrl: passportPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(passportPath);
+
+      // Insert verification record
+      const deviceId = getDeviceId();
+      await supabase.from('user_verifications').insert({
+        device_id: deviceId,
+        national_id_url: idPublicUrl,
+        passport_photo_url: passportPublicUrl,
+        listing_id: justSavedId,
+        status: 'pending',
+      });
+
+      // Update listing to pending verification
+      if (justSavedId) {
+        await supabase.from('landlord_listings').update({ is_verified: false }).eq('id', justSavedId);
+      }
+
+      alert("Documents uploaded successfully! Your verification badge is pending administrator approval.");
+      setShowVerification(false);
+      setJustSavedId(null);
+      fetchProperties();
+    } catch (error) {
+      console.error('Verification upload error:', error);
+      alert("Error uploading documents. Please try again.");
+    }
+  };
+
   return (
     <div style={getPanelBgStyle()}>
       <style>{`
@@ -766,8 +950,67 @@ export default function PropertiesDashboard() {
         }
       `}</style>
       <div style={getAppContainerStyle()}>
-        {selectedProperty ? (
+        {showVerification ? (
+          <div style={getVerificationCardStyle()}>
+            <h2 style={{ ...getFormTitleStyle(), marginBottom: "8px" }}>Account Security & Trust Verification</h2>
+            <p style={getFormSubtitleStyle()}>
+              To minimize local scams and protect our community, please provide identification credentials to verify your profile listing safely.
+            </p>
+            <form onSubmit={handleVerificationSubmit} style={getFormGridStructure()}>
+              <div style={getFieldBlockStyle()}>
+                <label style={getLabelStyle()}>National ID Full Picture Upload</label>
+                <div style={getUploadZoneStyle()}>
+                  <input
+                    type="file"
+                    name="national_id"
+                    accept="image/*"
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
+              <div style={getFieldBlockStyle()}>
+                <label style={getLabelStyle()}>Passport Size Photo of Yourself</label>
+                <div style={getUploadZoneStyle()}>
+                  <input
+                    type="file"
+                    name="passport_photo"
+                    accept="image/*"
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
+              <button type="submit" style={getSubmitPillBtnStyle()}>
+                Submit Verification Documents
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowVerification(false)}
+                style={{ ...getCloseDetailPanelBtn(), marginTop: "8px" }}
+              >
+                Skip for Now
+              </button>
+            </form>
+          </div>
+        ) : selectedProperty ? (
           <div style={{ maxWidth: "430px", margin: "0 auto" }}>
+            {/* Hero Image Section */}
+            {selectedProperty.image_urls && selectedProperty.image_urls.length > 0 ? (
+              <img
+                src={selectedProperty.image_urls[0]}
+                alt="Property"
+                style={getHeroImageStyle()}
+              />
+            ) : (
+              <div style={getPlaceholderImageStyle()}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#217d9d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+              </div>
+            )}
+
             <div
               style={{
                 display: "flex",
@@ -791,8 +1034,10 @@ export default function PropertiesDashboard() {
                   }}
                 >
                   PROP-{selectedProperty.id.toString().padStart(3, "0")} · {selectedProperty.room_type}
-                  {selectedProperty.is_verified && (
+                  {selectedProperty.is_verified ? (
                     <span style={getVerifiedBadgeStyle()}>🛡️ Verified Listing</span>
+                  ) : (
+                    <span style={getPendingBadgeStyle()}>⏳ Pending Verification</span>
                   )}
                 </h2>
               </div>
@@ -907,6 +1152,7 @@ export default function PropertiesDashboard() {
                       setHasSecurity(false);
                       setHasParking(false);
                       setHasInternet(false);
+                      setUploadedImageUrls([]);
                     }
                   }}
                   style={{
@@ -1017,8 +1263,10 @@ export default function PropertiesDashboard() {
                           >
                             <div>
                               {item.room_type}
-                              {item.is_verified && (
+                              {item.is_verified ? (
                                 <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                              ) : (
+                                <span style={getPendingBadgeStyle()}>⏳ Pending</span>
                               )}
                             </div>
                           </td>
@@ -1078,6 +1326,29 @@ export default function PropertiesDashboard() {
                 </p>
 
                 <form onSubmit={handleFormSubmit} style={getFormGridStructure()}>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Property images (multiple allowed)</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          setImageFiles(Array.from(e.target.files));
+                          handleImageUpload(e.target.files);
+                        }
+                      }}
+                      disabled={uploadingImages}
+                      style={getInputBoxStyle()}
+                    />
+                    {uploadingImages && <span style={getInputHelpTextStyle()}>Uploading images...</span>}
+                    {uploadedImageUrls.length > 0 && (
+                      <span style={getInputHelpTextStyle()}>
+                        {uploadedImageUrls.length} image(s) uploaded
+                      </span>
+                    )}
+                  </div>
+
                   <div style={getFieldBlockStyle()}>
                     <label style={getLabelStyle()}>WhatsApp number</label>
                     <input
@@ -1253,8 +1524,12 @@ export default function PropertiesDashboard() {
                     </div>
                   )}
 
-                  <button type="submit" style={getSubmitPillBtnStyle()}>
-                    {editingId ? "Update property profile" : "Save property profile"}
+                  <button 
+                    type="submit" 
+                    style={getSubmitPillBtnStyle()}
+                    disabled={uploadingImages}
+                  >
+                    {uploadingImages ? "Uploading images..." : (editingId ? "Update property profile" : "Save property profile")}
                   </button>
                 </form>
               </div>

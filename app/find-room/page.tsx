@@ -25,6 +25,8 @@ interface TenantRequest {
   preferred_move_in_date?: string;
   lease_length_wanted?: string;
   number_of_occupants?: number;
+  created_by?: string;
+  profile_photo_url?: string;
 }
 
 interface TenantFormData {
@@ -195,6 +197,16 @@ export default function TenantDashboard() {
     }
   };
 
+  // Device ownership tracking
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('mastanda_device_id');
+    if (!deviceId) {
+      deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('mastanda_device_id', deviceId);
+    }
+    return deviceId;
+  };
+
   const [tenants, setTenants] = useState<TenantRequest[]>([]);
   const [statusLoading, setStatusLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,6 +214,8 @@ export default function TenantDashboard() {
   const [filterCity, setFilterCity] = useState("All cities");
   const [selectedTenant, setSelectedTenant] = useState<TenantRequest | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [justSavedId, setJustSavedId] = useState<string | number | null>(null);
 
   const [formData, setFormData] = useState<TenantFormData>({
     name: "",
@@ -223,9 +237,12 @@ export default function TenantDashboard() {
   const [needs_security, setNeedsSecurity] = useState(false);
   const [needs_parking, setNeedsParking] = useState(false);
   const [needs_internet, setNeedsInternet] = useState(false);
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [uploadedProfilePhotoUrl, setUploadedProfilePhotoUrl] = useState<string>("");
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const fetchTenants = async () => {
     const { data, error } = await supabase
@@ -292,36 +309,71 @@ export default function TenantDashboard() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleProfilePhotoUpload = async (file: File | null) => {
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `tenant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const filePath = `tenant-photos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('tenant-photos')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('tenant-photos')
+        .getPublicUrl(filePath);
+
+      setUploadedProfilePhotoUrl(publicUrl);
+    } catch (error) {
+      console.error('Photo upload error:', error);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitError(null);
     const cleanPhone = String(formData.whatsapp_number || "").replace(/[^0-9]/g, "");
     const maxPrice = parseFloat(formData.max_price);
     const numOccupants = parseInt(formData.number_of_occupants) || null;
+    const deviceId = getDeviceId();
+
+    const tenantData = {
+      name: formData.name,
+      city: formData.city,
+      preferred_suburb: formData.preferred_suburb || null,
+      room_type_wanted: formData.room_type_wanted,
+      max_price: maxPrice,
+      whatsapp_number: cleanPhone,
+      status: formData.status,
+      needs_borehole,
+      needs_municipal_water,
+      needs_solar_backup,
+      needs_security,
+      needs_parking,
+      needs_internet,
+      searching_confirmed_date: formData.searching_confirmed_date || null,
+      preferred_move_in_date: formData.preferred_move_in_date || null,
+      lease_length_wanted: formData.lease_length_wanted || null,
+      number_of_occupants: numOccupants,
+      profile_photo_url: uploadedProfilePhotoUrl,
+      created_by: deviceId,
+    };
 
     if (editingId) {
       // Update existing tenant request
       const { error } = await supabase
         .from("tenant_requests")
-        .update({
-          name: formData.name,
-          city: formData.city,
-          preferred_suburb: formData.preferred_suburb || null,
-          room_type_wanted: formData.room_type_wanted,
-          max_price: maxPrice,
-          whatsapp_number: cleanPhone,
-          status: formData.status,
-          needs_borehole,
-          needs_municipal_water,
-          needs_solar_backup,
-          needs_security,
-          needs_parking,
-          needs_internet,
-          searching_confirmed_date: formData.searching_confirmed_date || null,
-          preferred_move_in_date: formData.preferred_move_in_date || null,
-          lease_length_wanted: formData.lease_length_wanted || null,
-          number_of_occupants: numOccupants,
-        })
+        .update(tenantData)
         .eq('id', editingId);
 
       if (error) {
@@ -331,33 +383,22 @@ export default function TenantDashboard() {
       setEditingId(null);
     } else {
       // Insert new tenant request
-      const { error } = await supabase.from("tenant_requests").insert([
+      const { data, error } = await supabase.from("tenant_requests").insert([
         {
-          name: formData.name,
-          city: formData.city,
-          preferred_suburb: formData.preferred_suburb || null,
-          room_type_wanted: formData.room_type_wanted,
-          max_price: maxPrice,
-          whatsapp_number: cleanPhone,
-          status: formData.status,
-          needs_borehole,
-          needs_municipal_water,
-          needs_solar_backup,
-          needs_security,
-          needs_parking,
-          needs_internet,
-          searching_confirmed_date: formData.searching_confirmed_date || null,
-          preferred_move_in_date: formData.preferred_move_in_date || null,
-          lease_length_wanted: formData.lease_length_wanted || null,
-          number_of_occupants: numOccupants,
+          ...tenantData,
           is_searching: true,
           is_verified: false,
         },
-      ]);
+      ]).select();
 
       if (error) {
         setSubmitError(error.message);
         return;
+      }
+
+      if (data && data[0]) {
+        setJustSavedId(data[0].id);
+        setShowVerification(true);
       }
     }
 
@@ -380,11 +421,21 @@ export default function TenantDashboard() {
     setNeedsSecurity(false);
     setNeedsParking(false);
     setNeedsInternet(false);
+    setProfilePhotoFile(null);
+    setUploadedProfilePhotoUrl("");
     setShowForm(false);
     fetchTenants();
   };
 
   const handleEditTenant = (tenant: TenantRequest) => {
+    const deviceId = getDeviceId();
+
+    // Ownership lockout check
+    if (tenant.created_by && tenant.created_by !== deviceId) {
+      alert("Access Denied: You can only edit profiles or listings you registered yourself.");
+      return;
+    }
+
     setEditingId(tenant.id);
     setFormData({
       name: tenant.name,
@@ -405,7 +456,11 @@ export default function TenantDashboard() {
     setNeedsSecurity(tenant.needs_security || false);
     setNeedsParking(tenant.needs_parking || false);
     setNeedsInternet(tenant.needs_internet || false);
+    setUploadedProfilePhotoUrl(tenant.profile_photo_url || "");
     setShowForm(true);
+
+    // Automatic smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleToggleSearching = async (tenant: TenantRequest) => {
@@ -557,6 +612,12 @@ export default function TenantDashboard() {
     ...getBaseBadgeStyle(),
     backgroundColor: "#132f1d",
     color: "#10b981",
+  });
+
+  const getPendingBadgeStyle = () => ({
+    ...getBaseBadgeStyle(),
+    backgroundColor: "#3a230f",
+    color: "#f59e0b",
   });
 
   const getVerifiedBadgeStyle = () => ({
@@ -763,6 +824,98 @@ export default function TenantDashboard() {
     color: isDarkMode ? "#ffffff" : "#212529",
   });
 
+  const getProfilePhotoStyle = () => ({
+    width: "120px",
+    height: "120px",
+    borderRadius: "50%",
+    objectFit: "cover",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
+    border: `3px solid #217d9d`,
+  });
+
+  const getPlaceholderPhotoStyle = () => ({
+    width: "120px",
+    height: "120px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
+    border: `3px dashed #217d9d`,
+  });
+
+  const getVerificationCardStyle = () => ({
+    backgroundColor: isDarkMode ? "#141414" : "#ffffff",
+    border: isDarkMode ? "1px solid #222" : "1px solid #e9ecef",
+    borderRadius: "20px",
+    padding: "32px 24px",
+    marginBottom: "24px",
+    boxShadow: isDarkMode ? "0 10px 15px -3px rgba(0,0,0,0.3)" : "0 10px 15px -3px rgba(0,0,0,0.1)",
+    width: "100%",
+    boxSizing: "border-box",
+  });
+
+  const getUploadZoneStyle = () => ({
+    border: `2px dashed ${isDarkMode ? "#2a2a2a" : "#e9ecef"}`,
+    borderRadius: "12px",
+    padding: "24px",
+    textAlign: "center" as const,
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    backgroundColor: isDarkMode ? "#0d0d0d" : "#f8f9fa",
+  });
+
+  const handleVerificationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const idFile = formData.get('national_id') as File;
+    const passportFile = formData.get('passport_photo') as File;
+
+    if (!idFile || !passportFile) {
+      alert("Please upload both documents to continue.");
+      return;
+    }
+
+    try {
+      // Upload National ID
+      const idExt = idFile.name.split('.').pop();
+      const idFileName = `verification_${Date.now()}_id.${idExt}`;
+      const idPath = `verification-documents/${idFileName}`;
+      await supabase.storage.from('verification-documents').upload(idPath, idFile);
+      const { data: { publicUrl: idPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(idPath);
+
+      // Upload Passport Photo
+      const passportExt = passportFile.name.split('.').pop();
+      const passportFileName = `verification_${Date.now()}_passport.${passportExt}`;
+      const passportPath = `verification-documents/${passportFileName}`;
+      await supabase.storage.from('verification-documents').upload(passportPath, passportFile);
+      const { data: { publicUrl: passportPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(passportPath);
+
+      // Insert verification record
+      const deviceId = getDeviceId();
+      await supabase.from('user_verifications').insert({
+        device_id: deviceId,
+        national_id_url: idPublicUrl,
+        passport_photo_url: passportPublicUrl,
+        tenant_request_id: justSavedId,
+        status: 'pending',
+      });
+
+      // Update tenant to pending verification
+      if (justSavedId) {
+        await supabase.from('tenant_requests').update({ is_verified: false }).eq('id', justSavedId);
+      }
+
+      alert("Documents uploaded successfully! Your verification badge is pending administrator approval.");
+      setShowVerification(false);
+      setJustSavedId(null);
+      fetchTenants();
+    } catch (error) {
+      console.error('Verification upload error:', error);
+      alert("Error uploading documents. Please try again.");
+    }
+  };
+
   return (
     <div style={getPanelBgStyle()}>
       <style>{`
@@ -775,7 +928,50 @@ export default function TenantDashboard() {
         }
       `}</style>
       <div style={getPanelContainerStyle()}>
-        {selectedTenant ? (
+        {showVerification ? (
+          <div style={getVerificationCardStyle()}>
+            <h2 style={{ ...getFormTitleStyle(), marginBottom: "8px" }}>Account Security & Trust Verification</h2>
+            <p style={getFormSubtitleStyle()}>
+              To minimize local scams and protect our community, please provide identification credentials to verify your profile listing safely.
+            </p>
+            <form onSubmit={handleVerificationSubmit} style={getFormGridStructure()}>
+              <div style={getFieldBlockStyle()}>
+                <label style={getLabelStyle()}>National ID Full Picture Upload</label>
+                <div style={getUploadZoneStyle()}>
+                  <input
+                    type="file"
+                    name="national_id"
+                    accept="image/*"
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
+              <div style={getFieldBlockStyle()}>
+                <label style={getLabelStyle()}>Passport Size Photo of Yourself</label>
+                <div style={getUploadZoneStyle()}>
+                  <input
+                    type="file"
+                    name="passport_photo"
+                    accept="image/*"
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
+              <button type="submit" style={getSubmitPillBtnStyle()}>
+                Submit Verification Documents
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowVerification(false)}
+                style={{ ...getCloseDetailPanelBtn(), marginTop: "8px" }}
+              >
+                Skip for Now
+              </button>
+            </form>
+          </div>
+        ) : selectedTenant ? (
           <div style={{ maxWidth: "430px", margin: "0 auto" }}>
             <div
               style={{
@@ -800,8 +996,10 @@ export default function TenantDashboard() {
                   }}
                 >
                   TEN-{selectedTenant.id.toString().padStart(3, "0")} · {selectedTenant.name}
-                  {selectedTenant.is_verified && (
+                  {selectedTenant.is_verified ? (
                     <span style={getVerifiedBadgeStyle()}>🛡️ Verified Tenant</span>
+                  ) : (
+                    <span style={getPendingBadgeStyle()}>⏳ Pending Verification</span>
                   )}
                 </h2>
               </div>
@@ -819,6 +1017,23 @@ export default function TenantDashboard() {
             </div>
 
             <div style={getDetailInnerCardBoxStyle()}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+                {selectedTenant.profile_photo_url ? (
+                  <img
+                    src={selectedTenant.profile_photo_url}
+                    alt="Profile"
+                    style={getProfilePhotoStyle()}
+                  />
+                ) : (
+                  <div style={getPlaceholderPhotoStyle()}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#217d9d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                  </div>
+                )}
+              </div>
+
               <div style={getMetaFieldGroup()}>
                 <span style={getMetaFieldLabel()}>Search location</span>
                 <span style={getMetaFieldValue()}>
@@ -926,6 +1141,7 @@ export default function TenantDashboard() {
                       setNeedsSecurity(false);
                       setNeedsParking(false);
                       setNeedsInternet(false);
+                      setUploadedProfilePhotoUrl("");
                     }
                   }}
                   style={{
@@ -1037,8 +1253,10 @@ export default function TenantDashboard() {
                           >
                             <div>
                               {item.name}
-                              {item.is_verified && (
+                              {item.is_verified ? (
                                 <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                              ) : (
+                                <span style={getPendingBadgeStyle()}>⏳ Pending</span>
                               )}
                             </div>
                           </td>
@@ -1108,6 +1326,23 @@ export default function TenantDashboard() {
                 </p>
 
                 <form onSubmit={handleFormSubmit} style={getFormGridStructure()}>
+                  <div style={getFieldBlockStyle()}>
+                    <label style={getLabelStyle()}>Profile photo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setProfilePhotoFile(e.target.files[0]);
+                          handleProfilePhotoUpload(e.target.files[0]);
+                        }
+                      }}
+                      disabled={uploadingPhoto}
+                      style={getInputBoxStyle()}
+                    />
+                    {uploadingPhoto && <span style={getInputHelpTextStyle()}>Uploading photo...</span>}
+                  </div>
+
                   <div style={getFieldBlockStyle()}>
                     <label style={getLabelStyle()}>Full name</label>
                     <input

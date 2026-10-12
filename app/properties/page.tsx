@@ -317,29 +317,43 @@ export default function PropertiesDashboard() {
 
     try {
       for (const file of Array.from(files)) {
+        // Verify file is a valid File object with proper binary payload
+        if (!(file instanceof File) || file.size === 0) {
+          console.error('Invalid file payload:', file);
+          continue;
+        }
+
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `property-images/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('property-images')
-          .upload(filePath, file);
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('property-images')
+            .upload(filePath, file);
 
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          continue;
+          if (uploadError) {
+            console.error('Storage upload error:', uploadError);
+            continue;
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('property-images')
+            .getPublicUrl(filePath);
+
+          urls.push(publicUrl);
+        } catch (networkError) {
+          console.error('Network upload failure:', networkError);
+          alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
+          setUploadingImages(false);
+          return;
         }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('property-images')
-          .getPublicUrl(filePath);
-
-        urls.push(publicUrl);
       }
 
       setUploadedImageUrls(prev => [...prev, ...urls]);
     } catch (error) {
       console.error('Image upload error:', error);
+      alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
     } finally {
       setUploadingImages(false);
     }
@@ -898,19 +912,51 @@ export default function PropertiesDashboard() {
       return;
     }
 
+    // Verify file payloads are valid File objects
+    if (!(idFile instanceof File) || idFile.size === 0 || !(passportFile instanceof File) || passportFile.size === 0) {
+      alert("Invalid file payloads. Please select valid image files.");
+      return;
+    }
+
     try {
       // Upload National ID
       const idExt = idFile.name.split('.').pop();
       const idFileName = `verification_${Date.now()}_id.${idExt}`;
       const idPath = `verification-documents/${idFileName}`;
-      await supabase.storage.from('verification-documents').upload(idPath, idFile);
+
+      try {
+        const { error: idUploadError } = await supabase.storage.from('verification-documents').upload(idPath, idFile);
+        if (idUploadError) {
+          console.error('National ID upload error:', idUploadError);
+          alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
+          return;
+        }
+      } catch (networkError) {
+        console.error('National ID network failure:', networkError);
+        alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
+        return;
+      }
+
       const { data: { publicUrl: idPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(idPath);
 
       // Upload Passport Photo
       const passportExt = passportFile.name.split('.').pop();
       const passportFileName = `verification_${Date.now()}_passport.${passportExt}`;
       const passportPath = `verification-documents/${passportFileName}`;
-      await supabase.storage.from('verification-documents').upload(passportPath, passportFile);
+
+      try {
+        const { error: passportUploadError } = await supabase.storage.from('verification-documents').upload(passportPath, passportFile);
+        if (passportUploadError) {
+          console.error('Passport photo upload error:', passportUploadError);
+          alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
+          return;
+        }
+      } catch (networkError) {
+        console.error('Passport photo network failure:', networkError);
+        alert("Storage upload failed: Please check your internet connection or local .env configuration strings.");
+        return;
+      }
+
       const { data: { publicUrl: passportPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(passportPath);
 
       // Insert verification record

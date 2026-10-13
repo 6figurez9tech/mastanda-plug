@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
 
 interface PropertyListing {
@@ -27,6 +28,7 @@ interface PropertyListing {
   max_occupants?: number;
   created_by?: string;
   image_urls?: string[];
+  property_images?: string[];
 }
 
 interface PropertyFormData {
@@ -164,6 +166,8 @@ function CustomDropdown({ value, options, placeholder, onSelect, isDarkMode }: C
 }
 
 export default function PropertiesDashboard() {
+  const router = useRouter();
+
   // Theme state with localStorage persistence
   const [isDarkMode, setIsDarkMode] = useState(true);
   
@@ -309,21 +313,21 @@ export default function PropertiesDashboard() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUpload = async (files: FileList | null) => {
+  const handleImageUpload = async (files: File[]) => {
     if (!files || files.length === 0) return;
 
     setUploadingImages(true);
     const urls: string[] = [];
 
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         // Verify file is a valid File object with proper binary payload
         if (!(file instanceof File) || file.size === 0) {
           console.error('Invalid file payload:', file);
           continue;
         }
 
-        // Generate unique timestamp-based file name every time (create or edit mode)
+        // Enforce randomized path names - isolated from any listing variables
         const fileExt = file.name.split('.').pop();
         const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `listings/${uniqueFileName}`;
@@ -351,7 +355,7 @@ export default function PropertiesDashboard() {
         }
       }
 
-      // Clean state update - append new URLs without mutating old array pointers
+      // Symmetrical array merging post-upload - append new URLs without mutating old array pointers
       setUploadedImageUrls(prev => [...prev, ...urls]);
     } catch (error) {
       console.error('Image upload error:', error);
@@ -415,6 +419,7 @@ export default function PropertiesDashboard() {
       lease_length: formData.lease_length || null,
       max_occupants: maxOccupants,
       image_urls: finalImageUrls,
+      property_images: finalImageUrls,
       created_by: deviceId,
     };
 
@@ -433,19 +438,27 @@ export default function PropertiesDashboard() {
       }
       console.log('Update successful');
 
-      // Live modal state sync on update - force the active open detail modal view to receive the new image array instantly
+      // 1. Force the active selection modal to explicitly grab the brand new merged arrays instantly
       if (selectedProperty && selectedProperty.id === editingId) {
         setSelectedProperty({
           ...selectedProperty,
-          image_urls: finalImageUrls
+          image_urls: finalImageUrls,
+          property_images: finalImageUrls
         });
       }
 
-      // Immediate post-update data re-fetch to get fresh records
+      // 2. Refresh the global parent properties display array with the fresh data object
+      setProperties(prev => prev.map(p => p.id === editingId ? { ...p, image_urls: finalImageUrls, property_images: finalImageUrls } : p));
+
+      // 3. Force Next.js router refresh to dump client-side cache
+      router.refresh();
+
+      // 4. Sync with server by calling primary database fetch function
       await fetchProperties();
 
-      // State variable synchronization reset
+      // 5. Delayed form state clean-up - only after state overrides are executed
       setEditingId(null);
+      setShowIntake(false);
     } else {
       // Insert new listing
       const { data, error } = await supabase.from("landlord_listings").insert([
@@ -491,7 +504,6 @@ export default function PropertiesDashboard() {
     setHasInternet(false);
     setImageFiles([]);
     setUploadedImageUrls([]);
-    setShowIntake(false);
   };
 
   const handleEditProperty = (property: PropertyListing) => {
@@ -1404,8 +1416,10 @@ export default function PropertiesDashboard() {
                       accept="image/*"
                       onChange={(e) => {
                         if (e.target.files) {
-                          setImageFiles(Array.from(e.target.files));
-                          handleImageUpload(e.target.files);
+                          // Absolute isolation of file objects - save as raw binary chunks immediately
+                          const newFiles = Array.from(e.target.files);
+                          setImageFiles(newFiles);
+                          handleImageUpload(newFiles);
                         }
                       }}
                       disabled={uploadingImages}

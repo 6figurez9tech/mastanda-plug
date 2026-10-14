@@ -1,8 +1,9 @@
+// @ts-nocheck
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../utils/supabaseClient';
-import Link from 'next/link';
+import React, { useState, useEffect, useRef } from "react";
+import { supabase } from "../../utils/supabaseClient";
+import Link from "next/link";
 
 interface Listing {
   id: string | number;

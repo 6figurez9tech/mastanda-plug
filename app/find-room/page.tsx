@@ -372,13 +372,23 @@ export default function TenantDashboard() {
 
     if (editingId) {
       // Update existing tenant request
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("tenant_requests")
         .update(tenantData)
-        .eq('id', editingId);
+        .eq('id', editingId)
+        .select();
 
       if (error) {
         setSubmitError(error.message);
+        return;
+      }
+
+      // Write-confirmation guard - a null error does not prove the row changed.
+      // When RLS blocks the write, .update().eq().select() resolves with an empty
+      // payload, so assert at least one row was actually modified. (No
+      // setUploadingImages state exists in this view, so only the alert fires here.)
+      if (!data || data.length === 0) {
+        alert("Database Update Warning: Profile modifications could not be written to the server. Please verify your table RLS policies.");
         return;
       }
       setEditingId(null);

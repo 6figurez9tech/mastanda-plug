@@ -427,39 +427,44 @@ export default function PropertiesDashboard() {
     if (editingId) {
       // Update existing listing with strict async barrier - ensures complete array is passed
       console.log('Updating property with ID:', editingId, 'and image_urls:', finalImageUrls);
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("landlord_listings")
         .update(listingData)
-        .eq('id', editingId);
+        .eq('id', editingId)
+        .select();
 
       if (error) {
         console.error('Update error:', error);
         setSubmitError(error.message);
         return;
       }
+
+      // Write-confirmation guard - a null error is NOT proof of success. When RLS
+      // blocks the write, .update().eq().select() resolves with an empty payload,
+      // so assert at least one row was actually modified before declaring victory.
+      if (!data || data.length === 0) {
+        console.error('Update wrote 0 rows (false-positive) for id:', editingId);
+        setUploadingImages(false);
+        alert("Database Update Warning: Profile modifications could not be written to the server. Please verify your table RLS policies.");
+        return;
+      }
       console.log('Update successful');
 
-      // 1. Force the active selection modal to explicitly grab the brand new merged arrays instantly
-      if (selectedProperty && selectedProperty.id === editingId) {
-        setSelectedProperty({
-          ...selectedProperty,
-          image_urls: finalImageUrls,
-          property_images: finalImageUrls
-        });
-      }
+      // 1. Clear the stale modal view reference instantly. Nulling the selected
+      //    property forces the open detail modal to unmount completely, breaking
+      //    its cached memory hold on the old property object layout, and closes
+      //    the main intake form drawer.
+      setSelectedProperty(null);
+      setShowIntake(false);
 
-      // 2. Refresh the global parent properties display array with the fresh data object
-      setProperties(prev => prev.map(p => p.id === editingId ? { ...p, image_urls: finalImageUrls, property_images: finalImageUrls } : p));
-
-      // 3. Force Next.js router refresh to dump client-side cache
+      // 2. Trigger a global list re-fetch, then force the Next.js client-side
+      //    router cache to bust open so the browser pulls the newly updated image
+      //    array straight from the Supabase rows on the next card click.
+      await fetchProperties();
       router.refresh();
 
-      // 4. Sync with server by calling primary database fetch function
-      await fetchProperties();
-
-      // 5. Delayed form state clean-up - only after state overrides are executed
+      // 3. Reset editing state now that the modal cache has been purged.
       setEditingId(null);
-      setShowIntake(false);
     } else {
       // Insert new listing
       const { data, error } = await supabase.from("landlord_listings").insert([

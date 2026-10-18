@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
+import VerificationBadgeManager from "../components/VerificationBadgeManager";
 
 interface PropertyListing {
   id: string | number;
@@ -23,6 +24,7 @@ interface PropertyListing {
   status?: string;
   is_available?: boolean;
   is_verified?: boolean;
+  verification_status?: string;
   availability_date?: string;
   preferred_move_in_date?: string;
   lease_length?: string;
@@ -220,6 +222,20 @@ export default function PropertiesDashboard() {
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [showVerification, setShowVerification] = useState(false);
   const [justSavedId, setJustSavedId] = useState<string | number | null>(null);
+
+  const handleVerificationChange = (id: string | number, isVerified: boolean, statusKey: string) => {
+    setProperties((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, is_verified: isVerified, verification_status: statusKey } : p
+      )
+    );
+    setSelectedProperty((prev) => {
+      if (prev && prev.id === id) {
+        return { ...prev, is_verified: isVerified, verification_status: statusKey };
+      }
+      return prev;
+    });
+  };
 
   const [showIntake, setShowIntake] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -1122,11 +1138,14 @@ export default function PropertiesDashboard() {
                   }}
                 >
                   PROP-{selectedProperty.id.toString().padStart(3, "0")} · {selectedProperty.room_type}
-                  {selectedProperty.is_verified ? (
-                    <span style={getVerifiedBadgeStyle()}>🛡️ Verified Listing</span>
-                  ) : (
-                    <span style={getPendingBadgeStyle()}>⏳ Pending Verification</span>
-                  )}
+                  <VerificationBadgeManager
+                    id={selectedProperty.id}
+                    isVerified={selectedProperty.is_verified}
+                    status={selectedProperty.verification_status}
+                    tableName="landlord_listings"
+                    onStatusChange={handleVerificationChange}
+                    isDarkMode={isDarkMode}
+                  />
                 </h2>
               </div>
               <a
@@ -1349,13 +1368,16 @@ export default function PropertiesDashboard() {
                               color: isDarkMode ? "#fff" : "#212529",
                             }}
                           >
-                            <div>
-                              {item.room_type}
-                              {item.is_verified ? (
-                                <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
-                              ) : (
-                                <span style={getPendingBadgeStyle()}>⏳ Pending</span>
-                              )}
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span>{item.room_type}</span>
+                              <VerificationBadgeManager
+                                id={item.id}
+                                isVerified={item.is_verified}
+                                status={item.verification_status}
+                                tableName="landlord_listings"
+                                onStatusChange={handleVerificationChange}
+                                isDarkMode={isDarkMode}
+                              />
                             </div>
                           </td>
                           <td style={getTdCellStyle()}>

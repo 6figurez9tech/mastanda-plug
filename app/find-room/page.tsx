@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../utils/supabaseClient";
+import VerificationBadgeManager from "../components/VerificationBadgeManager";
 
 interface TenantRequest {
   id: string | number;
@@ -26,6 +27,7 @@ interface TenantRequest {
   created_at?: string;
   is_searching?: boolean;
   is_verified?: boolean;
+  verification_status?: string;
   searching_confirmed_date?: string;
   preferred_move_in_date?: string;
   lease_length_wanted?: string;
@@ -226,6 +228,20 @@ export default function TenantDashboard() {
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [showVerification, setShowVerification] = useState(false);
   const [justSavedId, setJustSavedId] = useState<string | number | null>(null);
+
+  const handleVerificationChange = (id: string | number, isVerified: boolean, statusKey: string) => {
+    setTenants((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, is_verified: isVerified, verification_status: statusKey } : t
+      )
+    );
+    setSelectedTenant((prev) => {
+      if (prev && prev.id === id) {
+        return { ...prev, is_verified: isVerified, verification_status: statusKey };
+      }
+      return prev;
+    });
+  };
 
   const [formData, setFormData] = useState<TenantFormData>({
     name: "",
@@ -1033,11 +1049,14 @@ export default function TenantDashboard() {
                   }}
                 >
                   TEN-{selectedTenant.id.toString().padStart(3, "0")} · {selectedTenant.name}
-                  {selectedTenant.is_verified ? (
-                    <span style={getVerifiedBadgeStyle()}>🛡️ Verified Tenant</span>
-                  ) : (
-                    <span style={getPendingBadgeStyle()}>⏳ Pending Verification</span>
-                  )}
+                  <VerificationBadgeManager
+                    id={selectedTenant.id}
+                    isVerified={selectedTenant.is_verified}
+                    status={selectedTenant.verification_status}
+                    tableName="tenant_requests"
+                    onStatusChange={handleVerificationChange}
+                    isDarkMode={isDarkMode}
+                  />
                 </h2>
               </div>
               <a
@@ -1336,13 +1355,16 @@ export default function TenantDashboard() {
                                   {item.name ? item.name.charAt(0).toUpperCase() : "T"}
                                 </div>
                               )}
-                              <div>
-                                {item.name}
-                                {item.is_verified ? (
-                                  <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
-                                ) : (
-                                  <span style={getPendingBadgeStyle()}>⏳ Pending</span>
-                                )}
+                              <div style={{ display: "flex", alignItems: "center" }}>
+                                <span>{item.name}</span>
+                                <VerificationBadgeManager
+                                  id={item.id}
+                                  isVerified={item.is_verified}
+                                  status={item.verification_status}
+                                  tableName="tenant_requests"
+                                  onStatusChange={handleVerificationChange}
+                                  isDarkMode={isDarkMode}
+                                />
                               </div>
                             </div>
                           </td>

@@ -8,7 +8,8 @@ export interface VerificationBadgeManagerProps {
   isVerified?: boolean;
   status?: string;
   tableName: "landlord_listings" | "tenant_requests";
-  onStatusChange: (id: string | number, isVerified: boolean, status: string) => void;
+  onStatusChange?: (id: string | number, isVerified: boolean, status: string) => void;
+  onRequestVerification?: (id: string | number) => void;
   isDarkMode?: boolean;
 }
 
@@ -21,7 +22,7 @@ interface VerificationOption {
 const VERIFICATION_OPTIONS: VerificationOption[] = [
   { label: "⏳ Pending", isVerified: false, statusKey: "pending" },
   { label: "❌ Unverified", isVerified: false, statusKey: "unverified" },
-  { label: "🔵 Request Verification", isVerified: true, statusKey: "verified" },
+  { label: "🔵 Request Verification", isVerified: true, statusKey: "request_verification" },
 ];
 
 export default function VerificationBadgeManager({
@@ -30,6 +31,7 @@ export default function VerificationBadgeManager({
   status,
   tableName,
   onStatusChange,
+  onRequestVerification,
   isDarkMode = false,
 }: VerificationBadgeManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,14 +55,27 @@ export default function VerificationBadgeManager({
   }, [isOpen]);
 
   const handleSelectOption = async (option: VerificationOption) => {
-    setIsOpen(false);
-    setIsUpdating(true);
+    // Enforce strict permanent lockout: verified status can never be edited or altered
+    if (isVerified) return;
 
+    setIsOpen(false);
+
+    // 1. Separate Form Action & Strict Verification Deferral:
+    // When a user clicks "Request Verification", it must NOT trigger a database .update({ is_verified: true }).
+    // Instead, strictly trigger opening the Security Verification Form modal/drawer.
+    // The profile remains completely unverified until documents are successfully submitted.
+    if (option.statusKey === "request_verification" || option.label.includes("Request Verification")) {
+      if (onRequestVerification) {
+        onRequestVerification(id);
+      }
+      return;
+    }
+
+    setIsUpdating(true);
     try {
-      // 1. Shift the tracking boolean parameter straight on Supabase backend column
       const { error } = await supabase
         .from(tableName)
-        .update({ is_verified: option.isVerified })
+        .update({ is_verified: false })
         .eq("id", id);
 
       if (error) {
@@ -69,8 +84,7 @@ export default function VerificationBadgeManager({
         return;
       }
 
-      // 2. Seamlessly update frontend UI state without page reloads
-      onStatusChange(id, option.isVerified, option.statusKey);
+      onStatusChange?.(id, false, option.statusKey);
     } catch (err) {
       console.error("Unexpected error updating verification:", err);
     } finally {
@@ -81,24 +95,24 @@ export default function VerificationBadgeManager({
   return (
     <div
       ref={containerRef}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        if (isVerified) return;
+        e.stopPropagation();
+      }}
       style={{
         position: "relative",
         display: "inline-flex",
         alignItems: "center",
         verticalAlign: "middle",
         userSelect: "none",
+        // Strict Immutability Rule: if is_verified is TRUE, completely lock by setting pointerEvents: 'none'
+        pointerEvents: isVerified ? "none" : "auto",
       }}
     >
-      {/* Badge Button Trigger Element */}
+      {/* Badge Element */}
       {isVerified ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen((prev) => !prev);
-          }}
-          title="Verified Profile (Click to change status)"
+        <span
+          title="Verified Account (Permanent & Immutable)"
           style={{
             backgroundColor: "#1877f2",
             borderRadius: "50%",
@@ -110,17 +124,10 @@ export default function VerificationBadgeManager({
             marginLeft: "6px",
             border: "none",
             padding: 0,
-            cursor: isUpdating ? "wait" : "pointer",
-            outline: "none",
+            pointerEvents: "none",
+            cursor: "default",
             flexShrink: 0,
             boxShadow: "0 1px 3px rgba(24, 119, 242, 0.35)",
-            transition: "transform 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.15)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
           }}
         >
           <svg
@@ -144,7 +151,7 @@ export default function VerificationBadgeManager({
               strokeLinejoin="round"
             />
           </svg>
-        </button>
+        </span>
       ) : status === "unverified" ? (
         <button
           type="button"
@@ -152,7 +159,7 @@ export default function VerificationBadgeManager({
             e.stopPropagation();
             setIsOpen((prev) => !prev);
           }}
-          title="Unverified (Click to change status)"
+          title="Unverified (Click to update status)"
           style={{
             backgroundColor: isDarkMode ? "#2d1b1b" : "#fee2e2",
             borderRadius: "50%",
@@ -188,7 +195,7 @@ export default function VerificationBadgeManager({
             e.stopPropagation();
             setIsOpen((prev) => !prev);
           }}
-          title="Pending Verification (Click to change status)"
+          title="Pending Verification (Click to update status)"
           style={{
             backgroundColor: isDarkMode ? "#2d2215" : "#fef3c7",
             borderRadius: "50%",
@@ -219,8 +226,8 @@ export default function VerificationBadgeManager({
         </button>
       )}
 
-      {/* Floating Overlay Menu Container */}
-      {isOpen && (
+      {/* Floating Overlay Menu Container - Strictly unavailable once verified */}
+      {!isVerified && isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -241,8 +248,8 @@ export default function VerificationBadgeManager({
         >
           {VERIFICATION_OPTIONS.map((opt) => {
             const isCurrentlySelected =
-              opt.isVerified === isVerified &&
-              (opt.statusKey === status || (!status && !opt.isVerified && opt.statusKey === "pending"));
+              !isVerified &&
+              (opt.statusKey === status || (!status && opt.statusKey === "pending"));
             const isHovered = hoveredOption === opt.label;
 
             return (

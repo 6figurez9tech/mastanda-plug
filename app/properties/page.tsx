@@ -237,6 +237,12 @@ export default function PropertiesDashboard() {
     });
   };
 
+  const handleOpenVerification = (id: string | number) => {
+    setJustSavedId(id);
+    setShowVerification(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const [showIntake, setShowIntake] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -1017,25 +1023,36 @@ export default function PropertiesDashboard() {
 
       const { data: { publicUrl: passportPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(passportPath);
 
-      // Insert verification record
+      // Insert verification record with automated verification status
       const deviceId = getDeviceId();
       await supabase.from('user_verifications').insert({
         device_id: deviceId,
         national_id_url: idPublicUrl,
         passport_photo_url: passportPublicUrl,
         listing_id: justSavedId,
-        status: 'pending',
+        status: 'verified',
       });
 
-      // Update listing to pending verification
+      // Instant Automated Verification: Execute real-time .update({ is_verified: true }) straight to landlord_listings
       if (justSavedId) {
-        await supabase.from('landlord_listings').update({ is_verified: false }).eq('id', justSavedId);
+        const { error: updateError } = await supabase
+          .from('landlord_listings')
+          .update({ is_verified: true })
+          .eq('id', justSavedId);
+
+        if (updateError) {
+          console.error('Error updating listing verification:', updateError);
+          alert(`Verification update failed: ${updateError.message}`);
+          return;
+        }
+
+        handleVerificationChange(justSavedId, true, 'verified');
       }
 
-      alert("Documents uploaded successfully! Your verification badge is pending administrator approval.");
+      alert("Documents uploaded successfully! Verification granted and your permanent blue tick badge is now active.");
       setShowVerification(false);
       setJustSavedId(null);
-      fetchProperties();
+      await fetchProperties();
     } catch (error) {
       console.error('Verification upload error:', error);
       alert("Error uploading documents. Please try again.");
@@ -1144,6 +1161,7 @@ export default function PropertiesDashboard() {
                     status={selectedProperty.verification_status}
                     tableName="landlord_listings"
                     onStatusChange={handleVerificationChange}
+                    onRequestVerification={handleOpenVerification}
                     isDarkMode={isDarkMode}
                   />
                 </h2>
@@ -1376,6 +1394,7 @@ export default function PropertiesDashboard() {
                                 status={item.verification_status}
                                 tableName="landlord_listings"
                                 onStatusChange={handleVerificationChange}
+                                onRequestVerification={handleOpenVerification}
                                 isDarkMode={isDarkMode}
                               />
                             </div>

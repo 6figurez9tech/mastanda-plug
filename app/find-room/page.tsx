@@ -243,6 +243,12 @@ export default function TenantDashboard() {
     });
   };
 
+  const handleOpenVerification = (id: string | number) => {
+    setJustSavedId(id);
+    setShowVerification(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const [formData, setFormData] = useState<TenantFormData>({
     name: "",
     city: "Harare",
@@ -924,7 +930,7 @@ export default function TenantDashboard() {
 
       setVerificationPhotoUrl(passportPublicUrl);
 
-      // Insert verification record into user_verifications backend table
+      // Insert verification record into user_verifications backend table with automated verification status
       const deviceId = getDeviceId();
       await supabase.from('user_verifications').insert({
         device_id: deviceId,
@@ -932,20 +938,31 @@ export default function TenantDashboard() {
         verification_photo_url: passportPublicUrl,
         passport_photo_url: passportPublicUrl,
         tenant_request_id: justSavedId,
-        status: 'pending',
+        status: 'verified',
       });
 
-      // Update tenant to pending verification without modifying avatar_url
+      // Instant Automated Verification: Execute real-time .update({ is_verified: true }) straight to tenant_requests
       if (justSavedId) {
-        await supabase.from('tenant_requests').update({ is_verified: false }).eq('id', justSavedId);
+        const { error: updateError } = await supabase
+          .from('tenant_requests')
+          .update({ is_verified: true })
+          .eq('id', justSavedId);
+
+        if (updateError) {
+          console.error('Error updating tenant verification:', updateError);
+          alert(`Verification update failed: ${updateError.message}`);
+          return;
+        }
+
+        handleVerificationChange(justSavedId, true, 'verified');
       }
 
-      alert("Documents uploaded successfully! Your verification badge is pending administrator approval.");
+      alert("Documents uploaded successfully! Verification granted and your permanent blue tick badge is now active.");
       setShowVerification(false);
       setJustSavedId(null);
       setVerificationPhotoFile(null);
       setNationalIdFile(null);
-      fetchTenants();
+      await fetchTenants();
     } catch (error) {
       console.error('Verification upload error:', error);
       alert("Error uploading documents. Please try again.");
@@ -1055,6 +1072,7 @@ export default function TenantDashboard() {
                     status={selectedTenant.verification_status}
                     tableName="tenant_requests"
                     onStatusChange={handleVerificationChange}
+                    onRequestVerification={handleOpenVerification}
                     isDarkMode={isDarkMode}
                   />
                 </h2>
@@ -1363,6 +1381,7 @@ export default function TenantDashboard() {
                                   status={item.verification_status}
                                   tableName="tenant_requests"
                                   onStatusChange={handleVerificationChange}
+                                  onRequestVerification={handleOpenVerification}
                                   isDarkMode={isDarkMode}
                                 />
                               </div>

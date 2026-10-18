@@ -7,9 +7,13 @@ import { supabase } from "../../utils/supabaseClient";
 interface TenantRequest {
   id: string | number;
   name: string;
+  tenant_name?: string;
   city: string;
   preferred_suburb?: string | null;
+  suburb?: string | null;
   room_type_wanted: string;
+  room_type?: string;
+  property_type?: string;
   max_price: number | string;
   whatsapp_number: string;
   status: string;
@@ -210,9 +214,13 @@ export default function TenantDashboard() {
 
   const [tenants, setTenants] = useState<TenantRequest[]>([]);
   const [statusLoading, setStatusLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTerm = searchQuery;
+  const setSearchTerm = setSearchQuery;
   const [filterStatus, setFilterStatus] = useState("All statuses");
-  const [filterCity, setFilterCity] = useState("All cities");
+  const [cityFilter, setCityFilter] = useState("");
+  const filterCity = cityFilter || "All cities";
+  const setFilterCity = (val: string) => setCityFilter(val === "All cities" ? "" : val);
   const [selectedTenant, setSelectedTenant] = useState<TenantRequest | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [showVerification, setShowVerification] = useState(false);
@@ -276,32 +284,16 @@ export default function TenantDashboard() {
     };
   }, []);
 
-  let filteredTenants = tenants;
-  if (searchTerm.trim() !== "") {
-    const term = searchTerm.toLowerCase();
-    filteredTenants = filteredTenants.filter(t => {
-      const idStr = t.id ? t.id.toString().toLowerCase() : "";
-      const tenCode = "ten-" + idStr.padStart(3, "0");
-      const name = t.name ? t.name.toLowerCase() : "";
-      const suburb = t.preferred_suburb ? t.preferred_suburb.toLowerCase() : "";
-      const city = t.city ? t.city.toLowerCase() : "";
-      const roomType = t.room_type_wanted ? t.room_type_wanted.toLowerCase() : "";
-      return (
-        name.includes(term) ||
-        idStr.includes(term) ||
-        tenCode.includes(term) ||
-        suburb.includes(term) ||
-        city.includes(term) ||
-        roomType.includes(term)
-      );
-    });
-  }
-  if (filterStatus !== "All statuses") {
-    filteredTenants = filteredTenants.filter(t => t.status === filterStatus);
-  }
-  if (filterCity !== "All cities") {
-    filteredTenants = filteredTenants.filter(t => t.city === filterCity);
-  }
+  const filteredTenants = tenants.filter(item => {
+    const matchesSearch = searchQuery ? (
+      ((item.tenant_name || item.name) && (item.tenant_name || item.name).toLowerCase().includes(searchQuery.toLowerCase())) ||
+      ((item.suburb || item.preferred_suburb) && (item.suburb || item.preferred_suburb).toLowerCase().includes(searchQuery.toLowerCase())) ||
+      ((item.room_type || item.room_type_wanted || item.property_type) && (item.room_type || item.room_type_wanted || item.property_type).toLowerCase().includes(searchQuery.toLowerCase()))
+    ) : true;
+    
+    const matchesCity = cityFilter ? item.city === cityFilter : true;
+    return matchesSearch && matchesCity;
+  });
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -1190,9 +1182,9 @@ export default function TenantDashboard() {
             <div className="filter-suite-responsive" style={getFilterSuiteContainerStyle()}>
               <input
                 type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search by name or ID"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by name, suburb, or type..."
                 style={getSearchBarFieldStyle()}
                 className="filter-search-box"
               />

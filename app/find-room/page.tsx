@@ -32,6 +32,7 @@ interface TenantRequest {
   number_of_occupants?: number;
   created_by?: string;
   profile_photo_url?: string;
+  avatar_url?: string;
 }
 
 interface TenantFormData {
@@ -247,7 +248,16 @@ export default function TenantDashboard() {
   const [needs_parking, setNeedsParking] = useState(false);
   const [needs_internet, setNeedsInternet] = useState(false);
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
-  const [uploadedProfilePhotoUrl, setUploadedProfilePhotoUrl] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const profilePhotoUrl = avatarUrl;
+  const setProfilePhotoUrl = setAvatarUrl;
+  const uploadedProfilePhotoUrl = avatarUrl;
+  const setUploadedProfilePhotoUrl = setAvatarUrl;
+
+  const [nationalIdFile, setNationalIdFile] = useState<File | null>(null);
+  const [verificationPhotoFile, setVerificationPhotoFile] = useState<File | null>(null);
+  const [verificationPhotoUrl, setVerificationPhotoUrl] = useState<string>("");
+  const [uploadingVerification, setUploadingVerification] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -308,7 +318,7 @@ export default function TenantDashboard() {
     setUploadingPhoto(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `tenant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const fileName = `avatar_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const filePath = `tenant-photos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -324,7 +334,7 @@ export default function TenantDashboard() {
         .from('tenant-photos')
         .getPublicUrl(filePath);
 
-      setUploadedProfilePhotoUrl(publicUrl);
+      setAvatarUrl(publicUrl);
     } catch (error) {
       console.error('Photo upload error:', error);
     } finally {
@@ -358,7 +368,8 @@ export default function TenantDashboard() {
       preferred_move_in_date: formData.preferred_move_in_date || null,
       lease_length_wanted: formData.lease_length_wanted || null,
       number_of_occupants: numOccupants,
-      profile_photo_url: uploadedProfilePhotoUrl,
+      avatar_url: avatarUrl || null,
+      profile_photo_url: avatarUrl || null,
       created_by: deviceId,
     };
 
@@ -425,7 +436,7 @@ export default function TenantDashboard() {
     setNeedsParking(false);
     setNeedsInternet(false);
     setProfilePhotoFile(null);
-    setUploadedProfilePhotoUrl("");
+    setAvatarUrl("");
     setShowForm(false);
     fetchTenants();
   };
@@ -459,7 +470,7 @@ export default function TenantDashboard() {
     setNeedsSecurity(tenant.needs_security || false);
     setNeedsParking(tenant.needs_parking || false);
     setNeedsInternet(tenant.needs_internet || false);
-    setUploadedProfilePhotoUrl(tenant.profile_photo_url || "");
+    setAvatarUrl(tenant.avatar_url || tenant.profile_photo_url || "");
     setShowForm(true);
 
     // Automatic smooth scroll to top
@@ -833,7 +844,7 @@ export default function TenantDashboard() {
     borderRadius: "50%",
     objectFit: "cover",
     backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
-    border: `3px solid #217d9d`,
+    border: "2px solid #217d9d",
   });
 
   const getPlaceholderPhotoStyle = () => ({
@@ -871,14 +882,15 @@ export default function TenantDashboard() {
   const handleVerificationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const idFile = formData.get('national_id') as File;
-    const passportFile = formData.get('passport_photo') as File;
+    const idFile = nationalIdFile || (formData.get('national_id') as File);
+    const passportFile = verificationPhotoFile || (formData.get('passport_photo') as File);
 
     if (!idFile || !passportFile) {
       alert("Please upload both documents to continue.");
       return;
     }
 
+    setUploadingVerification(true);
     try {
       // Upload National ID
       const idExt = idFile.name.split('.').pop();
@@ -894,17 +906,20 @@ export default function TenantDashboard() {
       await supabase.storage.from('verification-documents').upload(passportPath, passportFile);
       const { data: { publicUrl: passportPublicUrl } } = supabase.storage.from('verification-documents').getPublicUrl(passportPath);
 
-      // Insert verification record
+      setVerificationPhotoUrl(passportPublicUrl);
+
+      // Insert verification record into user_verifications backend table
       const deviceId = getDeviceId();
       await supabase.from('user_verifications').insert({
         device_id: deviceId,
         national_id_url: idPublicUrl,
+        verification_photo_url: passportPublicUrl,
         passport_photo_url: passportPublicUrl,
         tenant_request_id: justSavedId,
         status: 'pending',
       });
 
-      // Update tenant to pending verification
+      // Update tenant to pending verification without modifying avatar_url
       if (justSavedId) {
         await supabase.from('tenant_requests').update({ is_verified: false }).eq('id', justSavedId);
       }
@@ -912,10 +927,14 @@ export default function TenantDashboard() {
       alert("Documents uploaded successfully! Your verification badge is pending administrator approval.");
       setShowVerification(false);
       setJustSavedId(null);
+      setVerificationPhotoFile(null);
+      setNationalIdFile(null);
       fetchTenants();
     } catch (error) {
       console.error('Verification upload error:', error);
       alert("Error uploading documents. Please try again.");
+    } finally {
+      setUploadingVerification(false);
     }
   };
 
@@ -946,6 +965,11 @@ export default function TenantDashboard() {
                     name="national_id"
                     accept="image/*"
                     required
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setNationalIdFile(e.target.files[0]);
+                      }
+                    }}
                     style={{ width: "100%" }}
                   />
                 </div>
@@ -958,16 +982,26 @@ export default function TenantDashboard() {
                     name="passport_photo"
                     accept="image/*"
                     required
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setVerificationPhotoFile(e.target.files[0]);
+                      }
+                    }}
                     style={{ width: "100%" }}
                   />
                 </div>
               </div>
-              <button type="submit" style={getSubmitPillBtnStyle()}>
-                Submit Verification Documents
+              <button type="submit" style={getSubmitPillBtnStyle()} disabled={uploadingVerification}>
+                {uploadingVerification ? "Uploading Documents..." : "Submit Verification Documents"}
               </button>
               <button
                 type="button"
-                onClick={() => setShowVerification(false)}
+                onClick={() => {
+                  setShowVerification(false);
+                  setJustSavedId(null);
+                  setVerificationPhotoFile(null);
+                  setNationalIdFile(null);
+                }}
                 style={{ ...getCloseDetailPanelBtn(), marginTop: "8px" }}
               >
                 Skip for Now
@@ -1021,9 +1055,9 @@ export default function TenantDashboard() {
 
             <div style={getDetailInnerCardBoxStyle()}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
-                {selectedTenant.profile_photo_url ? (
+                {(selectedTenant.avatar_url || selectedTenant.profile_photo_url) ? (
                   <img
-                    src={selectedTenant.profile_photo_url}
+                    src={selectedTenant.avatar_url || selectedTenant.profile_photo_url}
                     alt="Profile"
                     style={getProfilePhotoStyle()}
                   />
@@ -1144,7 +1178,8 @@ export default function TenantDashboard() {
                       setNeedsSecurity(false);
                       setNeedsParking(false);
                       setNeedsInternet(false);
-                      setUploadedProfilePhotoUrl("");
+                      setProfilePhotoFile(null);
+                      setAvatarUrl("");
                     }
                   }}
                   style={{
@@ -1254,13 +1289,61 @@ export default function TenantDashboard() {
                               color: isDarkMode ? "#fff" : "#212529",
                             }}
                           >
-                            <div>
-                              {item.name}
-                              {item.is_verified ? (
-                                <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              {item.avatar_url ? (
+                                <img
+                                  src={item.avatar_url}
+                                  alt={item.name}
+                                  style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    border: "2px solid #217d9d",
+                                    objectFit: "cover",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              ) : item.profile_photo_url ? (
+                                <img
+                                  src={item.profile_photo_url}
+                                  alt={item.name}
+                                  style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    border: "2px solid #217d9d",
+                                    objectFit: "cover",
+                                    flexShrink: 0,
+                                  }}
+                                />
                               ) : (
-                                <span style={getPendingBadgeStyle()}>⏳ Pending</span>
+                                <div
+                                  style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    border: "2px solid #217d9d",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    backgroundColor: isDarkMode ? "#1a1a1a" : "#e9ecef",
+                                    fontSize: "0.8rem",
+                                    fontWeight: "bold",
+                                    color: "#217d9d",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {item.name ? item.name.charAt(0).toUpperCase() : "T"}
+                                </div>
                               )}
+                              <div>
+                                {item.name}
+                                {item.is_verified ? (
+                                  <span style={getVerifiedBadgeStyle()}>🛡️ Verified</span>
+                                ) : (
+                                  <span style={getPendingBadgeStyle()}>⏳ Pending</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td style={getTdCellStyle()}>
@@ -1344,6 +1427,22 @@ export default function TenantDashboard() {
                       style={getInputBoxStyle()}
                     />
                     {uploadingPhoto && <span style={getInputHelpTextStyle()}>Uploading photo...</span>}
+                    {avatarUrl && (
+                      <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "12px" }}>
+                        <img
+                          src={avatarUrl}
+                          alt="Profile Preview"
+                          style={{
+                            width: "60px",
+                            height: "60px",
+                            borderRadius: "50%",
+                            border: "2px solid #217d9d",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <span style={{ fontSize: "0.85rem", color: "#217d9d", fontWeight: "600" }}>Photo uploaded</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={getFieldBlockStyle()}>
